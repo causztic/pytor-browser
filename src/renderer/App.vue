@@ -31,6 +31,10 @@
     }
     .action-button {
       color: #bbb;
+      width: 16px;
+      &.active {
+        color: #777;
+      }
     }
   }
 </style>
@@ -48,6 +52,9 @@
     </div>
     <div id="omnibox">
       <input type="text" id="url">
+    </div>
+    <div id="options" class="action-button active">
+      <i class="fa fa-ellipsis-v" aria-hidden="true"></i>
     </div>
   </nav>
 </template>
