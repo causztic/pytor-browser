@@ -1,0 +1,27 @@
+{
+  "name": "pytor-browser",
+  "version": "0.1.0",
+  "repository": "https://github.com/causztic/pytor-browser",
+  "author": "yaojie <limyaojie93@gmail.com>",
+  "license": "MIT",
+  "scripts": {
+    "dev": "electron-webpack dev",
+    "compile": "electron-webpack",
+    "dist": "yarn compile && electron-builder",
+    "dist:dir": "yarn dist -- --dir -c.compression=store -c.mac.identity=null"
+  },
+  "dependencies": {
+    "electron": "^3.0.7",
+    "source-map-support": "^0.5.9"
+  },
+  "devDependencies": {
+    "electron-builder": "^20.31.1",
+    "electron-webpack": "^2.3.1",
+    "electron-webpack-vue": "^2.2.1",
+    "eslint": "^5.8.0",
+    "node-sass": "^4.9.4",
+    "sass-loader": "^7.1.0",
+    "vue": "^2.5.17",
+    "webpack": "^4.23.1"
+  }
+}
