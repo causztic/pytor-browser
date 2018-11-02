@@ -40,27 +40,34 @@
 </style>
 
 <template>
-  <nav id="navigation">
-    <div id="back" class="action-button">
-      <i class="fa fa-arrow-left" aria-hidden="true"></i>
+  <div class="main">
+    <nav id="navigation">
+      <div id="back" class="action-button">
+        <i class="fa fa-arrow-left" aria-hidden="true"></i>
+      </div>
+      <div id="forward" class="action-button">
+        <i class="fa fa-arrow-right" aria-hidden="true"></i>
+      </div>
+      <div id="refresh" class="action-button">
+        <i class="fa fa-sync" aria-hidden="true"></i>
+      </div>
+      <div id="omnibox">
+        <input type="text" id="url">
+      </div>
+      <div id="options" class="action-button active">
+        <i class="fa fa-ellipsis-v" aria-hidden="true"></i>
+      </div>
+    </nav>
+    <div class="body">
+      <LoadingComponent />
     </div>
-    <div id="forward" class="action-button">
-      <i class="fa fa-arrow-right" aria-hidden="true"></i>
-    </div>
-    <div id="refresh" class="action-button">
-      <i class="fa fa-sync" aria-hidden="true"></i>
-    </div>
-    <div id="omnibox">
-      <input type="text" id="url">
-    </div>
-    <div id="options" class="action-button active">
-      <i class="fa fa-ellipsis-v" aria-hidden="true"></i>
-    </div>
-  </nav>
+  </div>
 </template>
 
 <script>
+  import LoadingComponent from './LoadingComponent.vue';
   export default {
-    name: 'app'
+    name: 'app',
+    components: { LoadingComponent }
   }
 </script>
