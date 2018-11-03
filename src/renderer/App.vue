@@ -1,6 +1,17 @@
 <style lang="scss">
   body {
     margin: 0;
+    height: 100vh;
+  }
+  .main {
+    display: flex;
+    width: 100%;
+    height: 100%;
+    flex-direction: column;
+  }
+  iframe {
+    flex-grow: 1;
+    border: none;
   }
   #navigation {
     padding: 8px 0;
@@ -73,17 +84,22 @@
       </div>
       <SettingsComponent />
     </nav>
-    <div class="body">
-      <LoadingComponent />
-    </div>
+    <iframe class="content" :srcdoc="initialHTML" />
+    <LoadingComponent />
   </div>
 </template>
 
 <script>
   import LoadingComponent from './LoadingComponent.vue';
   import SettingsComponent from './SettingsComponent.vue';
+
   export default {
     name: 'app',
+    data() {
+      return {
+        initialHTML: require('./503.html'),
+      };
+    },
     components: { LoadingComponent, SettingsComponent }
   }
 </script>
