@@ -3,14 +3,15 @@
     margin: 0;
   }
   #navigation {
-    padding: 8px;
+    padding: 8px 0;
     width: 100%;
     display: flex;
+    position: relative;
     align-items: center;
     background-color: #fafafa;
-    div {
+    .action-button, #omnibox {
       display: inline-block;
-      margin-right: 15px;
+      margin-right: 5px;
     }
     #omnibox {
       flex: 1;
@@ -30,10 +31,26 @@
       }
     }
     .action-button {
-      color: #bbb;
-      width: 16px;
+      color: #777;
+      height: 32px;
+      width: 32px;
+      line-height: 32px;
+      text-align: center;
+      cursor: pointer;
+      border-radius: 50%;
+      transition: all 0.3s;
       &.active {
-        color: #777;
+        background-color: #eee;
+      }
+      &:hover {
+        background-color: #dadada;
+      }
+      &.disabled {
+        color: #bbb;
+        cursor: initial;
+        &:hover {
+          background-color: initial;
+        }
       }
     }
   }
@@ -42,21 +59,19 @@
 <template>
   <div class="main">
     <nav id="navigation">
-      <div id="back" class="action-button">
+      <div id="back" class="action-button disabled">
         <i class="fa fa-arrow-left" aria-hidden="true"></i>
       </div>
-      <div id="forward" class="action-button">
+      <div id="forward" class="action-button disabled">
         <i class="fa fa-arrow-right" aria-hidden="true"></i>
       </div>
-      <div id="refresh" class="action-button">
+      <div id="refresh" class="action-button disabled">
         <i class="fa fa-sync" aria-hidden="true"></i>
       </div>
       <div id="omnibox">
         <input type="text" id="url">
       </div>
-      <div id="options" class="action-button active">
-        <i class="fa fa-ellipsis-v" aria-hidden="true"></i>
-      </div>
+      <SettingsComponent />
     </nav>
     <div class="body">
       <LoadingComponent />
@@ -66,8 +81,9 @@
 
 <script>
   import LoadingComponent from './LoadingComponent.vue';
+  import SettingsComponent from './SettingsComponent.vue';
   export default {
     name: 'app',
-    components: { LoadingComponent }
+    components: { LoadingComponent, SettingsComponent }
   }
 </script>
