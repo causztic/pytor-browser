@@ -12,7 +12,7 @@
 
 <template>
   <div class="content">
-    <iframe :srcdoc="response" />
+    <iframe :srcdoc="response === undefined ? initialHTML : response" />
   </div>
 </template>
 
@@ -26,7 +26,9 @@
       response: state => state.query.response
     }),
     created() {
-      this.$store.dispatch('query/getWebsite', 'https://www.motherfuckingwebsite.com');
+      this.$store.dispatch('status/startServers').then(() => {
+        this.$store.dispatch('query/getWebsite', 'https://www.motherfuckingwebsite.com');
+      });
     },
     data() {
       return {

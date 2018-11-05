@@ -3,7 +3,7 @@
 import { app, BrowserWindow } from "electron";
 import * as path from "path";
 import { format as formatUrl } from "url";
-import { isDevelopment, spawnServers } from "common/util";
+import { isDevelopment } from "common/util";
 
 // global reference to mainWindow (necessary to prevent window from being garbage collected)
 let mainWindow;
@@ -63,6 +63,4 @@ app.on("activate", () => {
 // create main BrowserWindow when electron is ready
 app.on("ready", () => {
   mainWindow = createMainWindow();
-  // spawn background nodes for simulation.
-  spawnServers();
 });
