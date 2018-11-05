@@ -14,12 +14,7 @@
     height: 10px;
     display: inline-block;
     border-radius: 50%;
-    &.inactive {
-      background-color: red;
-    }
-    &.active {
-      background-color: green;
-    }
+
     @keyframes blink-animation {
       25% {
         opacity: 0.5;
@@ -31,27 +26,35 @@
         opacity: 0.5;
       }
     }
-    &.blinking {
+
+    &.not-connected {
+       background-color: red;
+    };
+    &.connected {
+      background-color: green;
+    };
+    &.connecting {
+      background-color: green;
       animation: blink-animation 1.5s steps(5, start) infinite;
-    }
+    };
   }
 </style>
 
 <template>
   <div class="loading-messages">
     <span>{{ message }}</span>
-    <span id="status" :class="connected ? 'active' : 'inactive'"></span>
+    <span id="status" :class="connection_state"></span>
   </div>
 </template>
 
 <script>
+  import { mapState, mapActions } from 'vuex';
+
   export default {
     name: 'loading-component',
-    data() {
-      return {
-        connected: false,
-        message: 'You are not connected to the network.',
-      }
-    },
+    computed: mapState({
+      connection_state: state => state.status.connection_state,
+      message: state => state.status.message,
+    }),
   }
 </script>
