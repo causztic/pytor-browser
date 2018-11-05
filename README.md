@@ -1,4 +1,4 @@
-![logo](static/onion.png)
+![logo](src/renderer/onion.png)
 # pytor-browser
 
 ## Pre-Requisites
