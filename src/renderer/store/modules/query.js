@@ -12,8 +12,8 @@ const getters = {};
 
 // actions
 const actions = {
-  getWebsite({ commit }, website) {
-    // spawn background nodes for simulation.
+  getWebsite({ dispatch, commit }, website) {
+    dispatch('status/load', null, { root: true });
     commit("setResponse", null);
     const result = spawnClient(website);
 
@@ -33,6 +33,7 @@ const actions = {
 
     result.on("close", code => {
       console.log(`child process exited with code ${code}`);
+      dispatch('status/connected', null, { root: true });
     });
   }
 };

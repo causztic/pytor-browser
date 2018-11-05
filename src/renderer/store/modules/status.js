@@ -8,6 +8,12 @@ const state = {
 };
 
 const actions = {
+  load({ commit }) {
+    commit("loading");
+  },
+  connected({ commit }) {
+    commit("connected");
+  },
   startServers({ commit, state }) {
     if (!state.connected) {
       const instances = spawnServers();
@@ -45,6 +51,10 @@ const mutations = {
     state.message = "Connecting..";
     state.connection_state = "connecting";
     PopStateEvent.connected = false;
+  },
+  loading(state) {
+    state.message = "Loading page..";
+    state.connection_state = "connecting";
   },
   connected(state) {
     state.message = "Connected to network.";
