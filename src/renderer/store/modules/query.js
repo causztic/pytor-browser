@@ -1,4 +1,4 @@
-import { spawn } from "child_process";
+import { spawnClient } from "common/util";
 
 // initial state
 const state = {
@@ -15,11 +15,7 @@ const getters = {
 const actions = {
   getWebsite ({ commit, _}, website) {
     // spawn background nodes for simulation.
-    const result = spawn('python ../../mini_pytor/client.py',
-      ['localhost', '45000', '0', // server a
-       'localhost', '45001', '1', // server b
-       'localhost', '45002', '2', // server c
-      website]);
+    const result = spawnClient(website);
 
       result.stdout.on('data', (data) => {
         console.log(`stdout: ${data}`);
