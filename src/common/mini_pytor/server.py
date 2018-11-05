@@ -4,14 +4,12 @@ import pickle
 import os
 import select
 import sys
+import socket
+import random
+import struct
 import requests
 
-from socket import *
-from struct import *
-from random import randint
-
 import cryptography.hazmat.primitives.asymmetric.padding
-from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
@@ -20,12 +18,12 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
 from util import padder128
-from cell import Cell
+from cell import Cell, CellType
 
 class Client():
     """Client class"""
     def __init__(self, sock, key, generated_key):
-        self.socket = sock
+        self.sock = sock
         self.key = key  # the derived key
         # the generated elliptic curve diffie hellman key.
         self.generated_key = generated_key
@@ -37,76 +35,98 @@ class Client():
 class Server():
     """Server class"""
     CLIENTS = []
-    CLIENTSOCKS = []
+    CLIENT_SOCKS = []
 
     def __init__(self, port_number, identity):
-        tempopen = open(os.path.join(os.path.dirname(__file__), "privates/privatetest" + str(identity) + ".pem"), "rb")
-        self.true_private_key = serialization.load_pem_private_key(tempopen.read(
-        ), password=None, backend=default_backend())  # used for signing, etc.
+        pem_file = os.path.join(
+            os.path.dirname(__file__),
+            "privates/privatetest" + str(identity) + ".pem"
+            )
+        temp_open = open(pem_file, "rb")
+        self.true_private_key = serialization.load_pem_private_key(
+            temp_open.read(), password=None, backend=default_backend())  # used for signing, etc.
         # public key for sending out.
         self.sendingpublickey = self.true_private_key.public_key()
         # tcp type chosen for first.
-        self.server_socket = socket(AF_INET, SOCK_STREAM)
+        self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         # now you have a signature of your own damned public key.
         # better be "" or it'll listen only on localhost
         self.server_socket.bind(("", port_number))
         self.server_socket.listen(100)
 
-    def exchange_keys(self, clientsocket, obtainedCell):
-        """Exchange Key with someone, obtaining a shared secret. Also, generate salt
-        and pass it back to them with your private key."""
+    def exchange_keys(self, client_sock, obtained_cell):
+        """Exchange Key with someone, obtaining a shared secret.
+        Also, generate salt and pass it back to them with your private key."""
 
         private_key = ec.generate_private_key(
             ec.SECP384R1(), default_backend())  # elliptic curve
         public_key = private_key.public_key()  # duh same.
         serialised_public_key = public_key.public_bytes(
-            encoding=serialization.Encoding.PEM, format=serialization.PublicFormat.SubjectPublicKeyInfo)
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo
+            )
         # serialise the public key that I'm going to send them
-
-        theirkey = serialization.load_pem_public_key(
-            obtainedCell.payload, backend=default_backend())
-        shared_key = private_key.exchange(ec.ECDH(), theirkey)
-        salty = str.encode(str(randint(0, 99999999)))  # randomised IV
-        derived_key = HKDF(algorithm=hashes.SHA256(
-        ), length=32, salt=salty, info=None, backend=default_backend()).derive(shared_key)
-        reply_cell = cell(serialised_public_key,
-                          salt=salty, Type="ConnectResp")
-        signature = self.true_private_key.sign(salty,
-                                               cryptography.hazmat.primitives.asymmetric.padding.PSS(
-                                                   mgf=cryptography.hazmat.primitives.asymmetric.padding.MGF1(
-                                                       hashes.SHA256()),
-                                                   salt_length=cryptography.hazmat.primitives.asymmetric.padding.PSS.MAX_LENGTH), hashes.SHA256())
+        their_key = serialization.load_pem_public_key(
+            obtained_cell.payload, backend=default_backend())
+        shared_key = private_key.exchange(ec.ECDH(), their_key)
+        salty = str.encode(str(random.randint(0, 99999999)))  # randomised IV
+        derived_key = HKDF(
+            algorithm=hashes.SHA256(),
+            length=32,
+            salt=salty,
+            info=None,
+            backend=default_backend()
+            ).derive(shared_key)
+        reply_cell = Cell(serialised_public_key,
+                          salt=salty, ctype=CellType.CONNECT_RESP)
+        signature = self.true_private_key.sign(
+            salty,
+            cryptography.hazmat.primitives.asymmetric.padding.PSS(
+                mgf=cryptography.hazmat.primitives.asymmetric.padding.MGF1(
+                    algorithm=hashes.SHA256()),
+                salt_length=cryptography.hazmat.primitives\
+                                .asymmetric.padding.PSS.MAX_LENGTH
+                ),
+            hashes.SHA256()
+            )
         reply_cell.signature = signature  # assign the signature.
         print("reply cell")
         print(pickle.dumps(reply_cell))
         # send them the serialised version.
-        clientsocket.send(pickle.dumps(reply_cell))
+        client_sock.send(pickle.dumps(reply_cell))
         return private_key, derived_key
 
     def decrypt(self, thing):
-        """ thing that is in RSA encryption must be decrypted before continuing."""
-        return self.true_private_key.decrypt(thing, cryptography.hazmat.primitives.asymmetric.padding.OAEP(
-            mgf=cryptography.hazmat.primitives.asymmetric.padding.MGF1(algorithm=hashes.SHA256()), algorithm=hashes.SHA256(), label=None))
+        """thing that is in RSA encryption must be decrypted before continuing."""
+        return self.true_private_key.decrypt(
+            thing,
+            cryptography.hazmat.primitives.asymmetric.padding.OAEP(
+                mgf=cryptography.hazmat.primitives.asymmetric.padding.MGF1(
+                    algorithm=hashes.SHA256()),
+                algorithm=hashes.SHA256(),
+                label=None
+                )
+            )
 
-    def main(self):
+    def run(self):
         """main method"""
         client_class = None  # initialise as none.
-        readready, _, _ = select.select(
-            [self.server_socket] + self.CLIENTSOCKS, [], [])
-        for i in readready:
-            if (i == self.server_socket):  # i've gotten a new connection
+        read_ready, _, _ = select.select(
+            [self.server_socket] + self.CLIENT_SOCKS, [], [])
+        for i in read_ready:
+            if i == self.server_socket:  # i've gotten a new connection
                 print("client get")
-                (clientsocket, _) = self.server_socket.accept()
+                client_sock, _ = self.server_socket.accept()
                 # clientsocket.setblocking(0)
-                clientsocket.settimeout(0.3)
+                client_sock.settimeout(0.3)
                 try:
-                    obtainedCell = clientsocket.recv(
-                        4096)  # obtain their public key
+                    # obtain their public key
+                    obtained_cell = client_sock.recv(4096)
                     try:
                         print("raw data obtained. (Cell)")
-                        print(obtainedCell)
+                        print(obtained_cell)
                         # decrypt the item.
-                        obtainedCell = self.decrypt(obtainedCell)
+                        obtained_cell = self.decrypt(obtained_cell)
 
                     # this is due to decryption failure.
                     except ValueError:
@@ -117,25 +137,25 @@ class Server():
                         print("rejected one connection")
                         continue
                     print("decrypted cell with actual keys.")
-                    print(obtainedCell)
+                    print(obtained_cell)
                     # i.e grab the cell that was passed forward.
-                    obtainedCell = pickle.loads(obtainedCell)
+                    obtained_cell = pickle.loads(obtained_cell)
                     print("after pickle load")
-                    print(obtainedCell)
-                    if obtainedCell.type != "AddCon":
+                    print(obtained_cell)
+                    if obtained_cell.type != CellType.ADD_CON:
                         break  # it was not a connection request.
                     # obtain the generated public key, and the derived key.
-                    generatedPrivateKey, derivedkey = self.exchange_keys(
-                        clientsocket, obtainedCell)
+                    generated_privkey, derived_key = self.exchange_keys(
+                        client_sock, obtained_cell)
                     client_class = Client(
-                        clientsocket, derivedkey, generatedPrivateKey)
+                        client_sock, derived_key, generated_privkey)
                     self.CLIENTS.append(client_class)
-                    self.CLIENTSOCKS.append(clientsocket)
-                    print(client_class.socket.getpeername())
+                    self.CLIENT_SOCKS.append(client_sock)
+                    print(client_class.sock.getpeername())
                     print("Connected to ONE client.\n\n\n")
 
                 # error is socket error here.
-                except (error, ConnectionResetError, timeout):
+                except (struct.error, ConnectionResetError, socket.timeout):
                     print("socket ERROR! might have timed out.")
                     if client_class is not None:
                         self.CLIENTS.remove(client_class)
@@ -153,78 +173,110 @@ class Server():
                     print(received)
                     if not received:
                         raise ConnectionResetError
-                except (error, ConnectionResetError, ConnectionAbortedError, timeout):
+                except (struct.error, ConnectionResetError, 
+                        ConnectionAbortedError, socket.timeout):
                     print("Client was closed or timed out.")
                     sending_client.socket.close()
                     if sending_client.bounce_socket is not None:
                         sending_client.bounce_socket.close()
-                    self.CLIENTSOCKS.remove(i)
+                    self.CLIENT_SOCKS.remove(i)
                     self.CLIENTS.remove(sending_client)
                     continue
                 print("existing")
                 # received_data = self.decrypt(received)
-                gottencell = pickle.loads(received)
+                gotten_cell = pickle.loads(received)
                 derived_key = sending_client.key  # take his derived key
-                cipher = Cipher(algorithms.AES(derived_key), modes.CBC(
-                    gottencell.IV), backend=default_backend())
+                cipher = Cipher(
+                    algorithms.AES(derived_key),
+                    modes.CBC(gotten_cell.IV),
+                    backend=default_backend()
+                    )
                 decryptor = cipher.decryptor()
-                decrypted = decryptor.update(gottencell.payload)
+                decrypted = decryptor.update(gotten_cell.payload)
                 decrypted += decryptor.finalize()
                 cell_to_next = pickle.loads(decrypted)
                 print(cell_to_next.type)
-                if cell_to_next.type == "relay connect":  # is a request for a relay connect
+                # is a request for a relay connect
+                if cell_to_next.type == CellType.RELAY_CONNECT:
                     try:
                         # your connection is TCP.
-                        sock = socket(AF_INET, SOCK_STREAM)
-                        sock.connect((cell_to_next.ip, cell_to_next.port))
-                        print((cell_to_next.ip, cell_to_next.port))
+                        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                        sock.connect((cell_to_next.ip_addr, cell_to_next.port))
+                        print((cell_to_next.ip_addr, cell_to_next.port))
                         print("cell to next")
                         print(decrypted)
                         print("payload")
                         print(cell_to_next.payload)
                         # send over the cell payload
                         sock.send(cell_to_next.payload)
-                        theircell = sock.recv(4096)  # await answer
+                        their_cell = sock.recv(4096)  # await answer
                         print("got values")
-                        print(theircell)
-                        IV = os.urandom(16)
-                        cipher = Cipher(algorithms.AES(derived_key), modes.CBC(
-                            IV), backend=default_backend())
+                        print(their_cell)
+                        init_vector = os.urandom(16)
+                        cipher = Cipher(
+                            algorithms.AES(derived_key),
+                            modes.CBC(init_vector),
+                            backend=default_backend()
+                            )
                         encryptor = cipher.encryptor()
-                        if(theircell == b""):
+                        if their_cell == b"":
                             encrypted = encryptor.update(padder128(
-                                pickle.dumps(cell("", Type="failed"))))
+                                pickle.dumps(Cell("", ctype=CellType.FAILED))))
                             encrypted += encryptor.finalize()
                             print("sent failed")
-                            i.send(pickle.dumps(
-                                cell(encrypted, IV=IV, Type="failed")))
+                            i.send(pickle.dumps(Cell(
+                                encrypted,
+                                IV=init_vector,
+                                ctype=CellType.FAILED)))
                         else:
-                            encrypted = encryptor.update(padder128(
-                                pickle.dumps(cell(theircell, Type="ConnectResp"))))
+                            encrypted = encryptor.update(
+                                padder128(pickle.dumps(Cell(
+                                    their_cell,
+                                    ctype=CellType.CONNECT_RESP
+                                    )))
+                                )
                             encrypted += encryptor.finalize()
                             print("sent valid response")
-                            i.send(pickle.dumps(
-                                cell(encrypted, IV=IV, Type="AddCon")))
-                            sending_client.bounce_ip = cell_to_next.ip
+                            i.send(pickle.dumps(Cell(
+                                encrypted,
+                                IV=init_vector,
+                                ctype=CellType.ADD_CON
+                                )))
+                            sending_client.bounce_ip = cell_to_next.ip_addr
                             sending_client.bounce_port = cell_to_next.port
                             sending_client.bounce_socket = sock
                             print("connection success.\n\n\n\n\n")
-                    except (ConnectionRefusedError, ConnectionResetError, ConnectionAbortedError, error, timeout)as e:
-                        print(
-                            "failed to connect to other server. sending back failure message, or timed out.")
-                        IV = os.urandom(16)
-                        cipher = Cipher(algorithms.AES(derived_key), modes.CBC(
-                            IV), backend=default_backend())
+                    except (ConnectionRefusedError, ConnectionResetError,
+                            ConnectionAbortedError, struct.error,
+                            socket.timeout):
+                        print("failed to connect to other server. "
+                              + "sending back failure message, or timed out.")
+                        init_vector = os.urandom(16)
+                        cipher = Cipher(
+                            algorithms.AES(derived_key),
+                            modes.CBC(init_vector),
+                            backend=default_backend()
+                            )
                         encryptor = cipher.encryptor()
-                        encrypted = encryptor.update(padder128(pickle.dumps(
-                            cell(pickle.dumps(cell("CONNECTIONREFUSED", Type="failed")), Type="failed"))))
+                        encrypted = encryptor.update(
+                            padder128(pickle.dumps(Cell(
+                                pickle.dumps(Cell(
+                                    "CONNECTIONREFUSED",
+                                    ctype=CellType.FAILED
+                                    )),
+                                ctype=CellType.FAILED
+                                )))
+                            )
                         encrypted += encryptor.finalize()
-                        i.send(pickle.dumps(
-                            cell(encrypted, IV=IV, Type="failed")))
+                        i.send(pickle.dumps(Cell(
+                            encrypted,
+                            IV=init_vector,
+                            ctype=CellType.FAILED
+                            )))
                         print("sent back failure message.")
 
                 # is an item to be relayed.
-                elif cell_to_next.type == "relay":
+                elif cell_to_next.type == CellType.RELAY:
                     if sending_client.bounce_socket is None:  # check if there is bounce socket
                         return
                     sock = sending_client.bounce_socket
@@ -235,59 +287,85 @@ class Server():
                     print(cell_to_next.type)
                     sock.send(cell_to_next.payload)  # send over the cell
                     try:
-                        theircell = sock.recv(32768)  # await answer
-                    except timeout:
-                        theircell = "request timed out!"
+                        their_cell = sock.recv(32768)  # await answer
+                    except socket.timeout:
+                        their_cell = "request timed out!"
                     print("got answer back.. as a relay.")
-                    print(len(theircell))
-                    print(theircell)
-                    IV = os.urandom(16)
-                    cipher = Cipher(algorithms.AES(derived_key), modes.CBC(
-                        IV), backend=default_backend())
+                    print(len(their_cell))
+                    print(their_cell)
+                    init_vector = os.urandom(16)
+                    cipher = Cipher(
+                        algorithms.AES(derived_key),
+                        modes.CBC(init_vector),
+                        backend=default_backend()
+                        )
                     encryptor = cipher.encryptor()
                     encrypted = encryptor.update(
-                        padder128(pickle.dumps(cell(theircell, Type="ConnectResp"))))
+                        padder128(pickle.dumps(Cell(
+                            their_cell,
+                            ctype=CellType.CONNECT_RESP
+                            )))
+                        )
                     encrypted += encryptor.finalize()
-                    i.send(pickle.dumps(
-                        cell(encrypted, IV=IV, Type="AddCon")))
+                    i.send(pickle.dumps(Cell(
+                        encrypted,
+                        IV=init_vector,
+                        ctype=CellType.ADD_CON
+                        )))
                     print("Relay success.\n\n\n\n\n")
-                elif cell_to_next.type == "Req":
+                elif cell_to_next.type == CellType.REQ:
                     print(cell_to_next.payload)
-                    if isinstance(cell_to_next.payload, type("")):
+                    if isinstance(cell_to_next.payload, str):
                         request = cell_to_next.payload
                         try:
                             header = {
                                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.77 Safari/537.36"}
-                            a = requests.get(request, headers=header)
+                            req = requests.get(request, headers=header)
                             print("length of answer")
-                            print(len(a.content))
+                            print(len(req.content))
                         except requests.exceptions.ConnectionError:
-                            a = "ERROR"
+                            req = "ERROR"
                             print("failed to receive a response from the website.")
 
-                        IV = os.urandom(16)
+                        init_vector = os.urandom(16)
                         cipher = Cipher(algorithms.AES(derived_key), modes.CBC(
-                            IV), backend=default_backend())
+                            init_vector), backend=default_backend())
                         encryptor = cipher.encryptor()
                         encrypted = encryptor.update(
-                            padder128(pickle.dumps(cell(pickle.dumps(a), Type="ConnectResp"))))
+                            padder128(pickle.dumps(Cell(
+                                pickle.dumps(req),
+                                ctype=CellType.CONNECT_RESP
+                                )))
+                            )
                         encrypted += encryptor.finalize()
                         i.send(pickle.dumps(
-                            cell(encrypted, IV=IV, Type="AddCon")))
+                            Cell(encrypted, IV=init_vector, ctype=CellType.ADD_CON)))
                         print("VALID REQUEST REPLIED.")
                     else:
-                        IV = os.urandom(16)
-                        cipher = Cipher(algorithms.AES(derived_key), modes.CBC(
-                            IV), backend=default_backend())
+                        init_vector = os.urandom(16)
+                        cipher = Cipher(
+                            algorithms.AES(derived_key),
+                            modes.CBC(init_vector),
+                            backend=default_backend()
+                            )
                         encryptor = cipher.encryptor()
-                        encrypted = encryptor.update(padder128(pickle.dumps(
-                            cell("INVALID REQUEST DUMDUM", Type="ConnectResp"))))
+                        encrypted = encryptor.update(
+                            padder128(pickle.dumps(Cell(
+                                "INVALID REQUEST DUMDUM",
+                                ctype=CellType.CONNECT_RESP
+                                )))
+                            )
                         encrypted += encryptor.finalize()
-                        i.send(pickle.dumps(
-                            cell(encrypted, IV=IV, Type="AddCon")))
+                        i.send(pickle.dumps(Cell(
+                            encrypted,
+                            IV=init_vector,
+                            ctype=CellType.ADD_CON
+                            )))
                         print("INVALID REQUEST SENT BACK")
 
-if __name__ == "__main__":
+
+def main():
+    """Main function"""
     # TODO: use specific identity with a generator or something
 
     if len(sys.argv) == 2:
@@ -309,4 +387,8 @@ if __name__ == "__main__":
     print("Started server on %d with identity %d" % (port, identity))
 
     while True:
-        server.main()
+        server.run()
+
+
+if __name__ == "__main__":
+    main()

@@ -4,7 +4,7 @@ import pickle
 import os
 import json
 import sys
-from struct import error
+import struct
 import socket
 
 import cryptography.hazmat.primitives.asymmetric.padding
@@ -135,9 +135,10 @@ class Client():
                            ec_privkey, rsa_key_public, gonnectport))
                 return   # a server item is created.
             except InvalidSignature:
-                #print("Something went wrong.. Signature was invalid.")
+                if DEBUG:
+                    print("Something went wrong.. Signature was invalid.")
                 return None
-        except (error, ConnectionResetError, ConnectionRefusedError):
+        except (struct.error, ConnectionResetError, ConnectionRefusedError):
             print("disconnected or server is not online/ connection was refused.")
 
     def more_connect_1(self, gonnect, gonnectport, intermediate_servers, rsa_key):
@@ -202,7 +203,8 @@ class Client():
                     print(decrypted)
                 their_cell = pickle.loads(decrypted)
                 counter -= 1
-                # print(their_cell.payload)
+                if DEBUG:
+                    print(their_cell.payload)
                 their_cell = pickle.loads(their_cell.payload)
             if their_cell.type == CellType.FAILED:
                 if DEBUG:
@@ -246,7 +248,7 @@ class Client():
             if DEBUG:
                 print("connected successfully to server @ " + gonnect
                       + "   Port: " + str(gonnectport))
-        except (ConnectionResetError, ConnectionRefusedError, error):
+        except (ConnectionResetError, ConnectionRefusedError, struct.error):
             if DEBUG:
                 print("Socket Error, removing from the list.")
             del self.server_list[0]  # remove it from the lsit
@@ -260,8 +262,9 @@ class Client():
 
         sending_cell, ec_privkey = Client.make_first_connect_cell()
         sending_cell = pickle.dumps(sending_cell)
-        #print("Innermost cell with keys")
-        # print(sendingCell)
+        if DEBUG:
+            print("Innermost cell with keys")
+            print(sending_cell)
         sending_cell = rsa_key.encrypt(
             sending_cell,
             cryptography.hazmat.primitives.asymmetric.padding.OAEP(
@@ -272,8 +275,9 @@ class Client():
                 label=None
                 )
             )
-        #print("Innermost cell with keys (Encrypted)")
-        # print(sendingCell)
+        if DEBUG:
+            print("Innermost cell with keys (Encrypted)")
+            print(sending_cell)
         # connection type. exit node always knows
         sending_cell = Cell(sending_cell, ctype=CellType.RELAY_CONNECT)
         sending_cell.ip_addr = gonnect
@@ -310,9 +314,11 @@ class Client():
             sock.send(pickle.dumps(sending_cell))  # send over the cell
             their_cell = sock.recv(4096)  # await answer
             # you now receive a cell with encrypted payload.
-            # print(their_cell)
+            if DEBUG:
+                print(their_cell)
             their_cell = pickle.loads(their_cell)
-            # print(their_cell.payload)
+            if DEBUG:
+                print(their_cell.payload)
             counter = 0
             while counter < len(intermediate_servers):
                 cipher = Cipher(
@@ -323,7 +329,8 @@ class Client():
                 decryptor = cipher.decryptor()
                 decrypted = decryptor.update(their_cell.payload)
                 decrypted += decryptor.finalize()  # finalise decryption
-                # print(decrypted)
+                if DEBUG:
+                    print(decrypted)
                 their_cell = pickle.loads(decrypted)
                 counter += 1
                 their_cell = pickle.loads(their_cell.payload)
@@ -366,12 +373,13 @@ class Client():
             if DEBUG:
                 print("connected successfully to server @ " + gonnect
                       + "   Port: " + str(gonnectport))
-        except error:
+        except struct.error:
             print("socket error occurred")
 
     def req(self, request, intermediate_servers):
         """send out stuff in router."""
-        #print("REQUEST SENDING TEST")
+        if DEBUG:
+            print("REQUEST SENDING TEST")
         # must send IV and a cell that is encrypted with the next public key
         # public key list will have to be accessed in order with list of servers
         # number between is to know when to stop i guess.
@@ -452,7 +460,7 @@ class Client():
                 # TODO - the error code should be specific to our implementation, not generic ones
                 # e.g. node offline, decryption failure etc etc
                 print(json.dumps({"content": "", "status": 404}))
-        except error:
+        except struct.error:
             print("socketerror")
 
 
