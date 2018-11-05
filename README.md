@@ -1,5 +1,6 @@
 ![logo](src/renderer/onion.png)
-# pytor-browser
+# PyTor Browser
+A simple demonstration of onion-routing done in Python
 
 ## Pre-Requisites
 - Yarn
