@@ -173,7 +173,7 @@ class Server():
             else:  # came from an existing client.
                 try:
                     for k in self.CLIENTS:
-                        if k.socket == i:
+                        if k.sock == i:
                             sending_client = k
                     received = i.recv(4096)
                     print("got a packet..")
@@ -183,7 +183,7 @@ class Server():
                 except (struct.error, ConnectionResetError,
                         ConnectionAbortedError, socket.timeout):
                     print("Client was closed or timed out.")
-                    sending_client.socket.close()
+                    sending_client.sock.close()
                     if sending_client.bounce_socket is not None:
                         sending_client.bounce_socket.close()
                     self.CLIENT_SOCKS.remove(i)
@@ -196,7 +196,7 @@ class Server():
                 derived_key = sending_client.key  # take his derived key
                 cipher = Cipher(
                     algorithms.AES(derived_key),
-                    modes.CBC(gotten_cell.IV),
+                    modes.CBC(gotten_cell.init_vector),
                     backend=default_backend()
                 )
                 decryptor = cipher.decryptor()
@@ -344,8 +344,11 @@ class Server():
                             print("Failed to receive response from website")
 
                         init_vector = os.urandom(16)
-                        cipher = Cipher(algorithms.AES(derived_key), modes.CBC(
-                            init_vector), backend=default_backend())
+                        cipher = Cipher(
+                            algorithms.AES(derived_key),
+                            modes.CBC(init_vector),
+                            backend=default_backend()
+                        )
                         encryptor = cipher.encryptor()
                         encrypted = encryptor.update(
                             padder128(pickle.dumps(Cell(

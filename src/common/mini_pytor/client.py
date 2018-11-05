@@ -35,7 +35,7 @@ class Server():
 
 class Client():
     """Client class"""
-    server_list = []
+    SERVER_LIST = []
 
     def __init__(self):
 
@@ -130,7 +130,7 @@ class Client():
                 if CLIENT_DEBUG:
                     print("connected successfully to server @ " + gonnect
                           + "   Port: " + str(gonnectport))
-                self.server_list.append(
+                self.SERVER_LIST.append(
                     Server(gonnect, sock, derived_key,
                            ec_privkey, rsa_key_public, gonnectport))
                 return   # a server item is created.
@@ -182,14 +182,14 @@ class Client():
                             ctype=CellType.RELAY_CONNECT)
 
         try:
-            sock = intermediate_servers[0].socket
+            sock = intermediate_servers[0].sock
             sock.send(pickle.dumps(sending_cell))  # send over the cell
             if CLIENT_DEBUG:
                 print("cell sent: ")
                 print(pickle.dumps(sending_cell))
             their_cell = sock.recv(4096)  # await answer
             # you now receive a cell with encrypted payload.
-            counter = len(intermediate_servers)-1
+            counter = len(intermediate_servers) - 1
             their_cell = pickle.loads(their_cell)
             while counter >= 0:
                 cipher = Cipher(
@@ -244,7 +244,7 @@ class Client():
                 info=None,
                 backend=default_backend()
             ).derive(shared_key)
-            self.server_list.append(
+            self.SERVER_LIST.append(
                 Server(gonnect, sock, derived_key, ec_privkey, rsa_key, gonnectport))
             if CLIENT_DEBUG:
                 print("connected successfully to server @ " + gonnect
@@ -252,7 +252,7 @@ class Client():
         except (ConnectionResetError, ConnectionRefusedError, struct.error):
             if CLIENT_DEBUG:
                 print("Socket Error, removing from the list.")
-            del self.server_list[0]  # remove it from the lsit
+            del self.SERVER_LIST[0]  # remove it from the lsit
             if CLIENT_DEBUG:
                 print("REMOVED SERVER 0 DUE TO FAILED CONNECTION")
 
@@ -312,7 +312,7 @@ class Client():
         sending_cell.ip_addr = intermediate_servers[0].ip_addr
         sending_cell.port = intermediate_servers[0].port
         try:
-            sock = intermediate_servers[0].socket
+            sock = intermediate_servers[0].sock
             sock.send(pickle.dumps(sending_cell))  # send over the cell
             their_cell = sock.recv(4096)  # await answer
             # you now receive a cell with encrypted payload.
@@ -370,7 +370,7 @@ class Client():
                 info=None,
                 backend=default_backend()
             ).derive(shared_key)
-            self.server_list.append(
+            self.SERVER_LIST.append(
                 Server(gonnect, sock, derived_key, ec_privkey, rsa_key, gonnectport))
             if CLIENT_DEBUG:
                 print("connected successfully to server @ " + gonnect
@@ -388,8 +388,11 @@ class Client():
         # connection type. exit node always knows
         sending_cell = Cell(request, ctype=CellType.REQ)
         init_vector = os.urandom(16)
-        cipher = Cipher(algorithms.AES(intermediate_servers[2].key), modes.CBC(init_vector),
-                        backend=default_backend())  # 256 bit length cipher lel
+        cipher = Cipher(
+            algorithms.AES(intermediate_servers[2].key),
+            modes.CBC(init_vector),
+            backend=default_backend()
+        )  # 256 bit length cipher lel
         encryptor = cipher.encryptor()  # encrypt the entire cell
         encrypted = encryptor.update(padder128(pickle.dumps(sending_cell)))
         encrypted += encryptor.finalize()  # finalise encryption.
@@ -419,7 +422,7 @@ class Client():
         sending_cell.ip_addr = intermediate_servers[0].ip_addr
         sending_cell.port = intermediate_servers[0].port
         try:
-            sock = intermediate_servers[0].socket
+            sock = intermediate_servers[0].sock
             sock.send(pickle.dumps(sending_cell))  # send over the cell
             their_cell = sock.recv(32768)  # await answer
             # you now receive a cell with encrypted payload.
@@ -474,7 +477,7 @@ def main():
     if len(given_args) == 11:
         # TODO - refactor and use argument parsers.
         # See https://docs.python.org/3/library/argparse.html
-        for i in enumerate(given_args):
+        for i, _ in enumerate(given_args):
             if given_args[i] == "localhost":
                 given_args[i] = socket.gethostbyname(socket.gethostname())
 
@@ -482,29 +485,31 @@ def main():
         given_args[5] = int(given_args[5])
         given_args[8] = int(given_args[8])
 
+        pem_prefix = "./mini_pytor/publics/publictest"
+
         # set up static chain.
         # TODO - get the client to query a directory for the server keys instead of manually getting
-        temp_open = open("publics/publictest" + given_args[3] + ".pem", "rb")
+        temp_open = open(pem_prefix + given_args[3] + ".pem", "rb")
         public_key = serialization.load_pem_public_key(
             temp_open.read(), backend=default_backend())
         temp_open.close()
         my_client.first_connect(given_args[1], given_args[2], public_key)
 
-        temp_open = open("publics/publictest" + given_args[6] + ".pem", "rb")
+        temp_open = open(pem_prefix + given_args[6] + ".pem", "rb")
         public_key = serialization.load_pem_public_key(
             temp_open.read(), backend=default_backend())
         temp_open.close()
         my_client.more_connect_1(given_args[4], given_args[5],
-                                 my_client.server_list, public_key)
+                                 my_client.SERVER_LIST, public_key)
 
-        temp_open = open("publics/publictest" + given_args[9] + ".pem", "rb")
+        temp_open = open(pem_prefix + given_args[9] + ".pem", "rb")
         public_key = serialization.load_pem_public_key(
             temp_open.read(), backend=default_backend())
         temp_open.close()
         my_client.more_connect_2(given_args[7], given_args[8],
-                                 my_client.server_list, public_key)
+                                 my_client.SERVER_LIST, public_key)
 
-        my_client.req(given_args[10], my_client.server_list)
+        my_client.req(given_args[10], my_client.SERVER_LIST)
     else:
         print("insufficient arguments\n"
               + "<Server 1 IP> <Server 1 Port> <key 1 number> "

@@ -3,7 +3,7 @@
 from cryptography.hazmat.primitives import padding
 
 CLIENT_DEBUG = False
-SERVER_DEBUG = True
+SERVER_DEBUG = False
 
 
 def padder128(data):
