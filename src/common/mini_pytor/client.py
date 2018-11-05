@@ -59,7 +59,7 @@ class Client():
             format=serialization.PublicFormat.SubjectPublicKeyInfo
         )
         # send the initialising cell, by sending the DHpublicKeyBytes
-        sending_cell = Cell(dh_pubkey_bytes, ctype="AddCon")
+        sending_cell = Cell(dh_pubkey_bytes, ctype=CellType.ADD_CON)
         return sending_cell, ec_privkey
 
     def first_connect(self, gonnect, gonnectport, rsa_key_public):
@@ -163,7 +163,7 @@ class Client():
             print("Innermost cell with keys (Encrypted)")
             print(sending_cell)
         # connection type. exit node always knows
-        sending_cell = Cell(sending_cell, ctype="relay connect")
+        sending_cell = Cell(sending_cell, ctype=CellType.RELAY_CONNECT)
         sending_cell.ip_addr = gonnect
         # save the stuff i should be sending over.
         sending_cell.port = gonnectport
@@ -177,7 +177,7 @@ class Client():
         encryptor = cipher.encryptor()  # encrypt the entire cell
         encrypted = encryptor.update(padder128(pickle.dumps(sending_cell)))
         encrypted += encryptor.finalize()  # finalise encryption.
-        sending_cell = Cell(encrypted, IV=init_vector, ctype="relay connect")
+        sending_cell = Cell(encrypted, IV=init_vector, ctype=CellType.RELAY_CONNECT)
 
         try:
             sock = intermediate_servers[0].socket
@@ -192,7 +192,7 @@ class Client():
             while counter >= 0:
                 cipher = Cipher(
                     algorithms.AES(intermediate_servers[counter].key),
-                    modes.CBC(their_cell.IV),
+                    modes.CBC(their_cell.init_vector),
                     backend=default_backend()
                     )
                 decryptor = cipher.decryptor()
@@ -275,7 +275,7 @@ class Client():
         #print("Innermost cell with keys (Encrypted)")
         # print(sendingCell)
         # connection type. exit node always knows
-        sending_cell = Cell(sending_cell, ctype="relay connect")
+        sending_cell = Cell(sending_cell, ctype=CellType.RELAY_CONNECT)
         sending_cell.ip_addr = gonnect
         # save the stuff i should be sending over.
         sending_cell.port = gonnectport
@@ -288,10 +288,10 @@ class Client():
         encryptor = cipher.encryptor()  # encrypt the entire cell
         encrypted = encryptor.update(padder128(pickle.dumps(sending_cell)))
         encrypted += encryptor.finalize()  # finalise encryption.
-        sending_cell = Cell(encrypted, IV=init_vector, ctype="relay connect")
+        sending_cell = Cell(encrypted, IV=init_vector, ctype=CellType.RELAY_CONNECT)
         sending_cell.ip_addr = intermediate_servers[1].ip_addr
         sending_cell.port = intermediate_servers[1].port
-        sending_cell = Cell(pickle.dumps(sending_cell), ctype="relay")
+        sending_cell = Cell(pickle.dumps(sending_cell), ctype=CellType.RELAY)
         init_vector = os.urandom(16)
 
         cipher = Cipher(
@@ -302,7 +302,7 @@ class Client():
         encryptor = cipher.encryptor()  # encrypt the entire cell
         encrypted = encryptor.update(padder128(pickle.dumps(sending_cell)))
         encrypted += encryptor.finalize()  # finalise encryption.
-        sending_cell = Cell(encrypted, IV=init_vector, ctype="relay")
+        sending_cell = Cell(encrypted, IV=init_vector, ctype=CellType.RELAY)
         sending_cell.ip_addr = intermediate_servers[0].ip_addr
         sending_cell.port = intermediate_servers[0].port
         try:
@@ -317,7 +317,7 @@ class Client():
             while counter < len(intermediate_servers):
                 cipher = Cipher(
                     algorithms.AES(intermediate_servers[counter].key),
-                    modes.CBC(their_cell.IV),
+                    modes.CBC(their_cell.init_vector),
                     backend=default_backend()
                     )
                 decryptor = cipher.decryptor()
@@ -363,7 +363,9 @@ class Client():
                 ).derive(shared_key)
             self.server_list.append(
                 Server(gonnect, sock, derived_key, ec_privkey, rsa_key, gonnectport))
-            #print("connected successfully to server @ " + gonnect + "   Port: " + str(gonnectport))
+            if DEBUG:
+                print("connected successfully to server @ " + gonnect
+                      + "   Port: " + str(gonnectport))
         except error:
             print("socket error occurred")
 
@@ -371,20 +373,20 @@ class Client():
         """send out stuff in router."""
         #print("REQUEST SENDING TEST")
         # must send IV and a cell that is encrypted with the next public key
-        # public key list will have to be accessed in order with list of servers.
+        # public key list will have to be accessed in order with list of servers
         # number between is to know when to stop i guess.
         # connection type. exit node always knows
-        sending_cell = Cell(request, ctype="Req")
+        sending_cell = Cell(request, ctype=CellType.REQ)
         init_vector = os.urandom(16)
         cipher = Cipher(algorithms.AES(intermediate_servers[2].key), modes.CBC(init_vector),
                         backend=default_backend())  # 256 bit length cipher lel
         encryptor = cipher.encryptor()  # encrypt the entire cell
         encrypted = encryptor.update(padder128(pickle.dumps(sending_cell)))
         encrypted += encryptor.finalize()  # finalise encryption.
-        sending_cell = Cell(encrypted, IV=init_vector, ctype="relay")
+        sending_cell = Cell(encrypted, IV=init_vector, ctype=CellType.RELAY)
         sending_cell.ip_addr = intermediate_servers[2].ip_addr
         sending_cell.port = intermediate_servers[2].port
-        sending_cell = Cell(pickle.dumps(sending_cell), ctype="relay")
+        sending_cell = Cell(pickle.dumps(sending_cell), ctype=CellType.RELAY)
 
         init_vector = os.urandom(16)
         cipher = Cipher(algorithms.AES(intermediate_servers[1].key), modes.CBC(init_vector),
@@ -392,18 +394,18 @@ class Client():
         encryptor = cipher.encryptor()  # encrypt the entire cell
         encrypted = encryptor.update(padder128(pickle.dumps(sending_cell)))
         encrypted += encryptor.finalize()  # finalise encryption.
-        sending_cell = Cell(encrypted, IV=init_vector, ctype="relay")
+        sending_cell = Cell(encrypted, IV=init_vector, ctype=CellType.RELAY)
         sending_cell.ip_addr = intermediate_servers[1].ip_addr
         sending_cell.port = intermediate_servers[1].port
-        sending_cell = Cell(pickle.dumps(sending_cell), ctype="relay")
+        sending_cell = Cell(pickle.dumps(sending_cell), ctype=CellType.RELAY)
         init_vector = os.urandom(16)
 
         cipher = Cipher(algorithms.AES(intermediate_servers[0].key), modes.CBC(init_vector),
                         backend=default_backend())  # 256 bit length cipher lel
         encryptor = cipher.encryptor()  # encrypt the entire cell
         encrypted = encryptor.update(padder128(pickle.dumps(sending_cell)))
-        encrypted += encryptor.finalize()  # finalise encryption.
-        sending_cell = Cell(encrypted, IV=init_vector, ctype="relay")
+        encrypted += encryptor.finalize()  # finalise encryption
+        sending_cell = Cell(encrypted, IV=init_vector, ctype=CellType.RELAY)
         sending_cell.ip_addr = intermediate_servers[0].ip_addr
         sending_cell.port = intermediate_servers[0].port
         try:
@@ -423,7 +425,7 @@ class Client():
             while counter < len(intermediate_servers):
                 cipher = Cipher(
                     algorithms.AES(intermediate_servers[counter].key),
-                    modes.CBC(their_cell.IV),
+                    modes.CBC(their_cell.init_vector),
                     backend=default_backend()
                     )
                 decryptor = cipher.decryptor()
