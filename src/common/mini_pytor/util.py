@@ -2,7 +2,9 @@
 
 from cryptography.hazmat.primitives import padding
 
-DEBUG = False
+CLIENT_DEBUG = False
+SERVER_DEBUG = True
+
 
 def padder128(data):
     """ pad ip to 256 bits... because this can vary too"""

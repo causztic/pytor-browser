@@ -17,11 +17,13 @@ from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
-from util import padder128
+from util import padder128, SERVER_DEBUG
 from cell import Cell, CellType
+
 
 class Client():
     """Client class"""
+
     def __init__(self, sock, key, generated_key):
         self.sock = sock
         self.key = key  # the derived key
@@ -41,7 +43,7 @@ class Server():
         pem_file = os.path.join(
             os.path.dirname(__file__),
             "privates/privatetest" + str(identity) + ".pem"
-            )
+        )
         temp_open = open(pem_file, "rb")
         self.true_private_key = serialization.load_pem_private_key(
             temp_open.read(), password=None, backend=default_backend())  # used for signing, etc.
@@ -64,7 +66,7 @@ class Server():
         serialised_public_key = public_key.public_bytes(
             encoding=serialization.Encoding.PEM,
             format=serialization.PublicFormat.SubjectPublicKeyInfo
-            )
+        )
         # serialise the public key that I'm going to send them
         their_key = serialization.load_pem_public_key(
             obtained_cell.payload, backend=default_backend())
@@ -76,7 +78,7 @@ class Server():
             salt=salty,
             info=None,
             backend=default_backend()
-            ).derive(shared_key)
+        ).derive(shared_key)
         reply_cell = Cell(serialised_public_key,
                           salt=salty, ctype=CellType.CONNECT_RESP)
         signature = self.true_private_key.sign(
@@ -84,14 +86,15 @@ class Server():
             cryptography.hazmat.primitives.asymmetric.padding.PSS(
                 mgf=cryptography.hazmat.primitives.asymmetric.padding.MGF1(
                     algorithm=hashes.SHA256()),
-                salt_length=cryptography.hazmat.primitives\
-                                .asymmetric.padding.PSS.MAX_LENGTH
-                ),
+                salt_length=cryptography.hazmat.primitives
+                .asymmetric.padding.PSS.MAX_LENGTH
+            ),
             hashes.SHA256()
-            )
+        )
         reply_cell.signature = signature  # assign the signature.
-        print("reply cell")
-        print(pickle.dumps(reply_cell))
+        if SERVER_DEBUG:
+            print("reply cell")
+            print(pickle.dumps(reply_cell))
         # send them the serialised version.
         client_sock.send(pickle.dumps(reply_cell))
         return private_key, derived_key
@@ -105,8 +108,8 @@ class Server():
                     algorithm=hashes.SHA256()),
                 algorithm=hashes.SHA256(),
                 label=None
-                )
             )
+        )
 
     def run(self):
         """main method"""
@@ -115,7 +118,7 @@ class Server():
             [self.server_socket] + self.CLIENT_SOCKS, [], [])
         for i in read_ready:
             if i == self.server_socket:  # i've gotten a new connection
-                print("client get")
+                print("Client connecting...")
                 client_sock, _ = self.server_socket.accept()
                 # clientsocket.setblocking(0)
                 client_sock.settimeout(0.3)
@@ -123,8 +126,9 @@ class Server():
                     # obtain their public key
                     obtained_cell = client_sock.recv(4096)
                     try:
-                        print("raw data obtained. (Cell)")
-                        print(obtained_cell)
+                        if SERVER_DEBUG:
+                            print("raw data obtained. (Cell)")
+                            print(obtained_cell)
                         # decrypt the item.
                         obtained_cell = self.decrypt(obtained_cell)
 
@@ -134,8 +138,9 @@ class Server():
                             self.CLIENTS.remove(client_class)
                             # just in case.
                             # otherwise, it should continue
-                        print("rejected one connection")
+                        print("Rejected one connection")
                         continue
+
                     print("decrypted cell with actual keys.")
                     print(obtained_cell)
                     # i.e grab the cell that was passed forward.
@@ -173,7 +178,7 @@ class Server():
                     print(received)
                     if not received:
                         raise ConnectionResetError
-                except (struct.error, ConnectionResetError, 
+                except (struct.error, ConnectionResetError,
                         ConnectionAbortedError, socket.timeout):
                     print("Client was closed or timed out.")
                     sending_client.socket.close()
@@ -190,7 +195,7 @@ class Server():
                     algorithms.AES(derived_key),
                     modes.CBC(gotten_cell.IV),
                     backend=default_backend()
-                    )
+                )
                 decryptor = cipher.decryptor()
                 decrypted = decryptor.update(gotten_cell.payload)
                 decrypted += decryptor.finalize()
@@ -200,7 +205,8 @@ class Server():
                 if cell_to_next.type == CellType.RELAY_CONNECT:
                     try:
                         # your connection is TCP.
-                        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                        sock = socket.socket(
+                            socket.AF_INET, socket.SOCK_STREAM)
                         sock.connect((cell_to_next.ip_addr, cell_to_next.port))
                         print((cell_to_next.ip_addr, cell_to_next.port))
                         print("cell to next")
@@ -217,7 +223,7 @@ class Server():
                             algorithms.AES(derived_key),
                             modes.CBC(init_vector),
                             backend=default_backend()
-                            )
+                        )
                         encryptor = cipher.encryptor()
                         if their_cell == b"":
                             encrypted = encryptor.update(padder128(
@@ -233,15 +239,15 @@ class Server():
                                 padder128(pickle.dumps(Cell(
                                     their_cell,
                                     ctype=CellType.CONNECT_RESP
-                                    )))
-                                )
+                                )))
+                            )
                             encrypted += encryptor.finalize()
                             print("sent valid response")
                             i.send(pickle.dumps(Cell(
                                 encrypted,
                                 IV=init_vector,
                                 ctype=CellType.ADD_CON
-                                )))
+                            )))
                             sending_client.bounce_ip = cell_to_next.ip_addr
                             sending_client.bounce_port = cell_to_next.port
                             sending_client.bounce_socket = sock
@@ -256,23 +262,23 @@ class Server():
                             algorithms.AES(derived_key),
                             modes.CBC(init_vector),
                             backend=default_backend()
-                            )
+                        )
                         encryptor = cipher.encryptor()
                         encrypted = encryptor.update(
                             padder128(pickle.dumps(Cell(
                                 pickle.dumps(Cell(
                                     "CONNECTIONREFUSED",
                                     ctype=CellType.FAILED
-                                    )),
+                                )),
                                 ctype=CellType.FAILED
-                                )))
-                            )
+                            )))
+                        )
                         encrypted += encryptor.finalize()
                         i.send(pickle.dumps(Cell(
                             encrypted,
                             IV=init_vector,
                             ctype=CellType.FAILED
-                            )))
+                        )))
                         print("sent back failure message.")
 
                 # is an item to be relayed.
@@ -298,20 +304,20 @@ class Server():
                         algorithms.AES(derived_key),
                         modes.CBC(init_vector),
                         backend=default_backend()
-                        )
+                    )
                     encryptor = cipher.encryptor()
                     encrypted = encryptor.update(
                         padder128(pickle.dumps(Cell(
                             their_cell,
                             ctype=CellType.CONNECT_RESP
-                            )))
-                        )
+                        )))
+                    )
                     encrypted += encryptor.finalize()
                     i.send(pickle.dumps(Cell(
                         encrypted,
                         IV=init_vector,
                         ctype=CellType.ADD_CON
-                        )))
+                    )))
                     print("Relay success.\n\n\n\n\n")
                 elif cell_to_next.type == CellType.REQ:
                     print(cell_to_next.payload)
@@ -319,13 +325,17 @@ class Server():
                         request = cell_to_next.payload
                         try:
                             header = {
-                                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.77 Safari/537.36"}
+                                "User-Agent": "Mozilla/5.0 "
+                                + "(Windows NT 10.0; Win64; x64) "
+                                + "AppleWebKit/537.36 (KHTML, like Gecko) "
+                                + "Chrome/70.0.3538.77 Safari/537.36"
+                            }
                             req = requests.get(request, headers=header)
                             print("length of answer")
                             print(len(req.content))
                         except requests.exceptions.ConnectionError:
                             req = "ERROR"
-                            print("failed to receive a response from the website.")
+                            print("Failed to receive response from website")
 
                         init_vector = os.urandom(16)
                         cipher = Cipher(algorithms.AES(derived_key), modes.CBC(
@@ -335,8 +345,8 @@ class Server():
                             padder128(pickle.dumps(Cell(
                                 pickle.dumps(req),
                                 ctype=CellType.CONNECT_RESP
-                                )))
-                            )
+                            )))
+                        )
                         encrypted += encryptor.finalize()
                         i.send(pickle.dumps(
                             Cell(encrypted, IV=init_vector, ctype=CellType.ADD_CON)))
@@ -347,20 +357,20 @@ class Server():
                             algorithms.AES(derived_key),
                             modes.CBC(init_vector),
                             backend=default_backend()
-                            )
+                        )
                         encryptor = cipher.encryptor()
                         encrypted = encryptor.update(
                             padder128(pickle.dumps(Cell(
                                 "INVALID REQUEST DUMDUM",
                                 ctype=CellType.CONNECT_RESP
-                                )))
-                            )
+                            )))
+                        )
                         encrypted += encryptor.finalize()
                         i.send(pickle.dumps(Cell(
                             encrypted,
                             IV=init_vector,
                             ctype=CellType.ADD_CON
-                            )))
+                        )))
                         print("INVALID REQUEST SENT BACK")
 
 

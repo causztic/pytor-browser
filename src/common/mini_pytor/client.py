@@ -17,7 +17,7 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
-from util import padder128, DEBUG
+from util import padder128, CLIENT_DEBUG
 from cell import Cell, CellType
 
 
@@ -47,7 +47,7 @@ class Client():
         self.serialised_public_key = self.public_key.public_bytes(
             encoding=serialization.Encoding.PEM,
             format=serialization.PublicFormat.SubjectPublicKeyInfo
-            )
+        )
 
     @staticmethod
     def make_first_connect_cell():
@@ -71,7 +71,7 @@ class Client():
             sending_cell, ec_privkey = Client.make_first_connect_cell()
             # key encryption for RSA HERE USING SOME PUBLIC KEY
             readied_cell = pickle.dumps(sending_cell)
-            if DEBUG:
+            if CLIENT_DEBUG:
                 print("first connect Actual cell (encrypted bytes) ")
                 print(readied_cell)
             encrypted_cell = rsa_key_public.encrypt(
@@ -83,13 +83,13 @@ class Client():
                     label=None
                 )
             )
-            if DEBUG:
+            if CLIENT_DEBUG:
                 print("first connect Actual cell(decrypted bytes)")
                 print(encrypted_cell)
             sock.send(encrypted_cell)  # send my public key... tcp style
             their_cell = sock.recv(4096)
             their_cell = pickle.loads(their_cell)  # load up their cell
-            if DEBUG:
+            if CLIENT_DEBUG:
                 print(their_cell.type)
 
             # this cell isn't encrypted. Extract the signature to verify
@@ -101,11 +101,11 @@ class Client():
                     cryptography.hazmat.primitives.asymmetric.padding.PSS(
                         mgf=cryptography.hazmat.primitives.asymmetric.padding.MGF1(
                             algorithm=hashes.SHA256()),
-                        salt_length=cryptography.hazmat.primitives\
-                                        .asymmetric.padding.PSS.MAX_LENGTH
-                        ),
+                        salt_length=cryptography.hazmat.primitives
+                        .asymmetric.padding.PSS.MAX_LENGTH
+                    ),
                     hashes.SHA256()
-                    )
+                )
                 # verify that the cell was signed using their key.
                 # load up their key.
                 their_key = serialization.load_pem_public_key(
@@ -118,7 +118,7 @@ class Client():
                     salt=their_cell.salt,
                     info=None,
                     backend=default_backend()
-                    ).derive(shared_key)
+                ).derive(shared_key)
                 # cipher = Cipher(algorithms.AES(derived_key), modes.CBC(IV),
                 # backend=default_backend()) #256 bit length cipher lel
                 # encryptor = cipher.encryptor()
@@ -127,7 +127,7 @@ class Client():
                 # decryptor.update(ct) + decryptor.finalize()
 
                 # Connection is established at this point.
-                if DEBUG:
+                if CLIENT_DEBUG:
                     print("connected successfully to server @ " + gonnect
                           + "   Port: " + str(gonnectport))
                 self.server_list.append(
@@ -135,7 +135,7 @@ class Client():
                            ec_privkey, rsa_key_public, gonnectport))
                 return   # a server item is created.
             except InvalidSignature:
-                if DEBUG:
+                if CLIENT_DEBUG:
                     print("Something went wrong.. Signature was invalid.")
                 return None
         except (struct.error, ConnectionResetError, ConnectionRefusedError):
@@ -148,7 +148,7 @@ class Client():
 
         sending_cell, ec_privkey = Client.make_first_connect_cell()
         sending_cell = pickle.dumps(sending_cell)
-        if DEBUG:
+        if CLIENT_DEBUG:
             print("Innermost cell with keys")
             print(sending_cell)
         sending_cell = rsa_key.encrypt(
@@ -158,9 +158,9 @@ class Client():
                     algorithm=hashes.SHA256()),
                 algorithm=hashes.SHA256(),
                 label=None
-                )
             )
-        if DEBUG:
+        )
+        if CLIENT_DEBUG:
             print("Innermost cell with keys (Encrypted)")
             print(sending_cell)
         # connection type. exit node always knows
@@ -174,16 +174,17 @@ class Client():
             algorithms.AES(intermediate_servers[0].key),
             modes.CBC(init_vector),
             backend=default_backend()
-            )  # 256 bit length cipher lel
+        )  # 256 bit length cipher lel
         encryptor = cipher.encryptor()  # encrypt the entire cell
         encrypted = encryptor.update(padder128(pickle.dumps(sending_cell)))
         encrypted += encryptor.finalize()  # finalise encryption.
-        sending_cell = Cell(encrypted, IV=init_vector, ctype=CellType.RELAY_CONNECT)
+        sending_cell = Cell(encrypted, IV=init_vector,
+                            ctype=CellType.RELAY_CONNECT)
 
         try:
             sock = intermediate_servers[0].socket
             sock.send(pickle.dumps(sending_cell))  # send over the cell
-            if DEBUG:
+            if CLIENT_DEBUG:
                 print("cell sent: ")
                 print(pickle.dumps(sending_cell))
             their_cell = sock.recv(4096)  # await answer
@@ -195,19 +196,19 @@ class Client():
                     algorithms.AES(intermediate_servers[counter].key),
                     modes.CBC(their_cell.init_vector),
                     backend=default_backend()
-                    )
+                )
                 decryptor = cipher.decryptor()
                 decrypted = decryptor.update(their_cell.payload)
                 decrypted += decryptor.finalize()  # finalise decryption
-                if DEBUG:
+                if CLIENT_DEBUG:
                     print(decrypted)
                 their_cell = pickle.loads(decrypted)
                 counter -= 1
-                if DEBUG:
+                if CLIENT_DEBUG:
                     print(their_cell.payload)
                 their_cell = pickle.loads(their_cell.payload)
             if their_cell.type == CellType.FAILED:
-                if DEBUG:
+                if CLIENT_DEBUG:
                     print("FAILED AT CONNECTION!")
                 if their_cell.payload == "CONNECTIONREFUSED":
                     print("Connection was refused. Is the server online yet?")
@@ -223,11 +224,11 @@ class Client():
                 cryptography.hazmat.primitives.asymmetric.padding.PSS(
                     mgf=cryptography.hazmat.primitives.asymmetric.padding.MGF1(
                         algorithm=hashes.SHA256()),
-                    salt_length=cryptography.hazmat.primitives\
-                                    .asymmetric.padding.PSS.MAX_LENGTH
-                    ),
+                    salt_length=cryptography.hazmat.primitives
+                    .asymmetric.padding.PSS.MAX_LENGTH
+                ),
                 hashes.SHA256()
-                )
+            )
             # Verify that the cell was signed using their key.
             # At this point, you have the cell that is the public key of your target server.
             # Additionally, salt too..
@@ -242,17 +243,17 @@ class Client():
                 salt=their_cell.salt,
                 info=None,
                 backend=default_backend()
-                ).derive(shared_key)
+            ).derive(shared_key)
             self.server_list.append(
                 Server(gonnect, sock, derived_key, ec_privkey, rsa_key, gonnectport))
-            if DEBUG:
+            if CLIENT_DEBUG:
                 print("connected successfully to server @ " + gonnect
                       + "   Port: " + str(gonnectport))
         except (ConnectionResetError, ConnectionRefusedError, struct.error):
-            if DEBUG:
+            if CLIENT_DEBUG:
                 print("Socket Error, removing from the list.")
             del self.server_list[0]  # remove it from the lsit
-            if DEBUG:
+            if CLIENT_DEBUG:
                 print("REMOVED SERVER 0 DUE TO FAILED CONNECTION")
 
     def more_connect_2(self, gonnect, gonnectport, intermediate_servers, rsa_key):
@@ -262,7 +263,7 @@ class Client():
 
         sending_cell, ec_privkey = Client.make_first_connect_cell()
         sending_cell = pickle.dumps(sending_cell)
-        if DEBUG:
+        if CLIENT_DEBUG:
             print("Innermost cell with keys")
             print(sending_cell)
         sending_cell = rsa_key.encrypt(
@@ -270,12 +271,12 @@ class Client():
             cryptography.hazmat.primitives.asymmetric.padding.OAEP(
                 mgf=cryptography.hazmat.primitives.asymmetric.padding.MGF1(
                     algorithm=hashes.SHA256()
-                    ),
+                ),
                 algorithm=hashes.SHA256(),
                 label=None
-                )
             )
-        if DEBUG:
+        )
+        if CLIENT_DEBUG:
             print("Innermost cell with keys (Encrypted)")
             print(sending_cell)
         # connection type. exit node always knows
@@ -288,11 +289,12 @@ class Client():
             algorithms.AES(intermediate_servers[1].key),
             modes.CBC(init_vector),
             backend=default_backend()
-            )  # 256 bit length cipher lel
+        )  # 256 bit length cipher lel
         encryptor = cipher.encryptor()  # encrypt the entire cell
         encrypted = encryptor.update(padder128(pickle.dumps(sending_cell)))
         encrypted += encryptor.finalize()  # finalise encryption.
-        sending_cell = Cell(encrypted, IV=init_vector, ctype=CellType.RELAY_CONNECT)
+        sending_cell = Cell(encrypted, IV=init_vector,
+                            ctype=CellType.RELAY_CONNECT)
         sending_cell.ip_addr = intermediate_servers[1].ip_addr
         sending_cell.port = intermediate_servers[1].port
         sending_cell = Cell(pickle.dumps(sending_cell), ctype=CellType.RELAY)
@@ -302,7 +304,7 @@ class Client():
             algorithms.AES(intermediate_servers[0].key),
             modes.CBC(init_vector),
             backend=default_backend()
-            )  # 256 bit length cipher lel
+        )  # 256 bit length cipher lel
         encryptor = cipher.encryptor()  # encrypt the entire cell
         encrypted = encryptor.update(padder128(pickle.dumps(sending_cell)))
         encrypted += encryptor.finalize()  # finalise encryption.
@@ -314,10 +316,10 @@ class Client():
             sock.send(pickle.dumps(sending_cell))  # send over the cell
             their_cell = sock.recv(4096)  # await answer
             # you now receive a cell with encrypted payload.
-            if DEBUG:
+            if CLIENT_DEBUG:
                 print(their_cell)
             their_cell = pickle.loads(their_cell)
-            if DEBUG:
+            if CLIENT_DEBUG:
                 print(their_cell.payload)
             counter = 0
             while counter < len(intermediate_servers):
@@ -325,17 +327,17 @@ class Client():
                     algorithms.AES(intermediate_servers[counter].key),
                     modes.CBC(their_cell.init_vector),
                     backend=default_backend()
-                    )
+                )
                 decryptor = cipher.decryptor()
                 decrypted = decryptor.update(their_cell.payload)
                 decrypted += decryptor.finalize()  # finalise decryption
-                if DEBUG:
+                if CLIENT_DEBUG:
                     print(decrypted)
                 their_cell = pickle.loads(decrypted)
                 counter += 1
                 their_cell = pickle.loads(their_cell.payload)
             if their_cell.type == CellType.FAILED:
-                if DEBUG:
+                if CLIENT_DEBUG:
                     print("FAILED AT CONNECTION!")
                 return
             # their_cell = pickle.loads(their_cell.payload)
@@ -350,9 +352,9 @@ class Client():
                     mgf=cryptography.hazmat.primitives.asymmetric.padding.MGF1(
                         algorithm=hashes.SHA256()),
                     salt_length=cryptography.hazmat.primitives.asymmetric.padding.PSS.MAX_LENGTH
-                    ),
+                ),
                 hashes.SHA256()
-                )
+            )
             # Verify that the cell was signed using their key.
             # At this point, you have the cell that is the public key of your target server.
             # Additionally, salt too...
@@ -367,10 +369,10 @@ class Client():
                 salt=their_cell.salt,
                 info=None,
                 backend=default_backend()
-                ).derive(shared_key)
+            ).derive(shared_key)
             self.server_list.append(
                 Server(gonnect, sock, derived_key, ec_privkey, rsa_key, gonnectport))
-            if DEBUG:
+            if CLIENT_DEBUG:
                 print("connected successfully to server @ " + gonnect
                       + "   Port: " + str(gonnectport))
         except struct.error:
@@ -378,7 +380,7 @@ class Client():
 
     def req(self, request, intermediate_servers):
         """send out stuff in router."""
-        if DEBUG:
+        if CLIENT_DEBUG:
             print("REQUEST SENDING TEST")
         # must send IV and a cell that is encrypted with the next public key
         # public key list will have to be accessed in order with list of servers
@@ -421,12 +423,12 @@ class Client():
             sock.send(pickle.dumps(sending_cell))  # send over the cell
             their_cell = sock.recv(32768)  # await answer
             # you now receive a cell with encrypted payload.
-            if DEBUG:
+            if CLIENT_DEBUG:
                 print("received cell")
                 print(len(their_cell))
                 print(their_cell)
             their_cell = pickle.loads(their_cell)
-            if DEBUG:
+            if CLIENT_DEBUG:
                 print("received cell payload")
                 print(their_cell.payload)
             counter = 0
@@ -435,7 +437,7 @@ class Client():
                     algorithms.AES(intermediate_servers[counter].key),
                     modes.CBC(their_cell.init_vector),
                     backend=default_backend()
-                    )
+                )
                 decryptor = cipher.decryptor()
                 decrypted = decryptor.update(their_cell.payload)
                 decrypted += decryptor.finalize()  # finalise decryption
@@ -445,7 +447,7 @@ class Client():
                     their_cell = pickle.loads(their_cell.payload)
 
             if their_cell.type == CellType.FAILED:
-                if DEBUG:
+                if CLIENT_DEBUG:
                     print("FAILED AT CONNECTION!")
                 return
 
