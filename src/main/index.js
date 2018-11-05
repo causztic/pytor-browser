@@ -11,7 +11,9 @@ const isDevelopment = process.env.NODE_ENV !== "production";
 let mainWindow;
 
 function createMainWindow() {
-  const window = new BrowserWindow({show: false});
+  const window = new BrowserWindow({
+    show: false
+  });
   window.maximize();
 
   if (isDevelopment) {

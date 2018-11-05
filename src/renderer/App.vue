@@ -9,10 +9,6 @@
     height: 100%;
     flex-direction: column;
   }
-  iframe {
-    flex-grow: 1;
-    border: none;
-  }
   #navigation {
     padding: 8px 0;
     width: 100%;
@@ -84,7 +80,7 @@
       </div>
       <SettingsComponent />
     </nav>
-    <iframe class="content" :srcdoc="initialHTML" />
+    <BrowserComponent />
     <LoadingComponent />
   </div>
 </template>
@@ -92,14 +88,10 @@
 <script>
   import LoadingComponent from './components/LoadingComponent.vue';
   import SettingsComponent from './components/SettingsComponent.vue';
+  import BrowserComponent from './components/BrowserComponent.vue';
 
   export default {
     name: 'app',
-    data() {
-      return {
-        initialHTML: require(`${__static}/503.html`),
-      };
-    },
-    components: { LoadingComponent, SettingsComponent }
+    components: { LoadingComponent, SettingsComponent, BrowserComponent }
   }
 </script>

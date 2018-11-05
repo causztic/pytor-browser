@@ -1,5 +1,6 @@
 {
   "name": "pytor-browser",
+  "productName": "Pytor",
   "version": "0.1.0",
   "repository": "https://github.com/causztic/pytor-browser",
   "author": "yaojie <limyaojie93@gmail.com>",
