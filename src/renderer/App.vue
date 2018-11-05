@@ -97,7 +97,7 @@
     name: 'app',
     data() {
       return {
-        initialHTML: require('./503.html'),
+        initialHTML: require(`${__static}/503.html`),
       };
     },
     components: { LoadingComponent, SettingsComponent }
