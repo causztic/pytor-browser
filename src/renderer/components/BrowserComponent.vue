@@ -12,7 +12,7 @@
 
 <template>
   <div class="content">
-    <iframe :srcdoc="response === undefined ? initialHTML : response" />
+    <iframe :srcdoc="response === null ? initialHTML : response" />
   </div>
 </template>
 
@@ -22,13 +22,21 @@
 
   export default {
     name: "browser-component",
+    props: ["url", "fired"],
     computed: mapState({
-      response: state => state.query.response
+      response: state => state.query.response,
+      connected: state => state.status.connected,
     }),
+    watch: {
+      fired: function(newVal, oldVal) {
+        if (newVal && this.connected) {
+          this.$store.dispatch('query/getWebsite', this.url);
+          this.$emit('update:fired', false);
+        }
+      }
+    },
     created() {
-      this.$store.dispatch('status/startServers').then(() => {
-        this.$store.dispatch('query/getWebsite', 'https://www.motherfuckingwebsite.com');
-      });
+      Promise.resolve(this.$store.dispatch('status/startServers'));
     },
     data() {
       return {

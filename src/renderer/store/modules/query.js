@@ -3,8 +3,8 @@ import { spawnClient } from "common/util";
 // initial state
 const state = {
   history: [],
-  response: undefined,
-  status: undefined
+  response: null,
+  status: null
 };
 
 // getters
@@ -14,6 +14,7 @@ const getters = {};
 const actions = {
   getWebsite({ commit }, website) {
     // spawn background nodes for simulation.
+    commit("setResponse", null);
     const result = spawnClient(website);
 
     console.log(result);
