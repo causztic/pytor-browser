@@ -6,7 +6,6 @@ import json
 import sys
 from struct import error
 import socket
-import requests
 
 import cryptography.hazmat.primitives.asymmetric.padding
 from cryptography.hazmat.primitives.asymmetric import rsa
@@ -19,7 +18,7 @@ from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
 from util import padder128, DEBUG
-from cell import Cell
+from cell import Cell, CellType
 
 
 class Server():
@@ -36,7 +35,7 @@ class Server():
 
 class Client():
     """Client class"""
-    serverList = []
+    server_list = []
 
     def __init__(self):
 
@@ -60,7 +59,7 @@ class Client():
             format=serialization.PublicFormat.SubjectPublicKeyInfo
         )
         # send the initialising cell, by sending the DHpublicKeyBytes
-        sending_cell = Cell(dh_pubkey_bytes, Type="AddCon")
+        sending_cell = Cell(dh_pubkey_bytes, ctype="AddCon")
         return sending_cell, ec_privkey
 
     def first_connect(self, gonnect, gonnectport, rsa_key_public):
@@ -131,7 +130,7 @@ class Client():
                 if DEBUG:
                     print("connected successfully to server @ " + gonnect
                           + "   Port: " + str(gonnectport))
-                self.serverList.append(
+                self.server_list.append(
                     Server(gonnect, sock, derived_key,
                            ec_privkey, rsa_key_public, gonnectport))
                 return   # a server item is created.
@@ -164,8 +163,8 @@ class Client():
             print("Innermost cell with keys (Encrypted)")
             print(sending_cell)
         # connection type. exit node always knows
-        sending_cell = Cell(sending_cell, Type="relay connect")
-        sending_cell.ip = gonnect
+        sending_cell = Cell(sending_cell, ctype="relay connect")
+        sending_cell.ip_addr = gonnect
         # save the stuff i should be sending over.
         sending_cell.port = gonnectport
         init_vector = os.urandom(16)
@@ -178,7 +177,7 @@ class Client():
         encryptor = cipher.encryptor()  # encrypt the entire cell
         encrypted = encryptor.update(padder128(pickle.dumps(sending_cell)))
         encrypted += encryptor.finalize()  # finalise encryption.
-        sending_cell = Cell(encrypted, IV=init_vector, Type="relay connect")
+        sending_cell = Cell(encrypted, IV=init_vector, ctype="relay connect")
 
         try:
             sock = intermediate_servers[0].socket
@@ -205,7 +204,7 @@ class Client():
                 counter -= 1
                 # print(their_cell.payload)
                 their_cell = pickle.loads(their_cell.payload)
-            if their_cell.type == their_cell._Types[3]:
+            if their_cell.type == CellType.FAILED:
                 if DEBUG:
                     print("FAILED AT CONNECTION!")
                 if their_cell.payload == "CONNECTIONREFUSED":
@@ -242,7 +241,7 @@ class Client():
                 info=None,
                 backend=default_backend()
                 ).derive(shared_key)
-            self.serverList.append(
+            self.server_list.append(
                 Server(gonnect, sock, derived_key, ec_privkey, rsa_key, gonnectport))
             if DEBUG:
                 print("connected successfully to server @ " + gonnect
@@ -250,7 +249,7 @@ class Client():
         except (ConnectionResetError, ConnectionRefusedError, error):
             if DEBUG:
                 print("Socket Error, removing from the list.")
-            del self.serverList[0]  # remove it from the lsit
+            del self.server_list[0]  # remove it from the lsit
             if DEBUG:
                 print("REMOVED SERVER 0 DUE TO FAILED CONNECTION")
 
@@ -276,7 +275,7 @@ class Client():
         #print("Innermost cell with keys (Encrypted)")
         # print(sendingCell)
         # connection type. exit node always knows
-        sending_cell = Cell(sending_cell, Type="relay connect")
+        sending_cell = Cell(sending_cell, ctype="relay connect")
         sending_cell.ip_addr = gonnect
         # save the stuff i should be sending over.
         sending_cell.port = gonnectport
@@ -289,10 +288,10 @@ class Client():
         encryptor = cipher.encryptor()  # encrypt the entire cell
         encrypted = encryptor.update(padder128(pickle.dumps(sending_cell)))
         encrypted += encryptor.finalize()  # finalise encryption.
-        sending_cell = Cell(encrypted, IV=init_vector, Type="relay connect")
-        sending_cell.ip_addr = intermediate_servers[1].ip
+        sending_cell = Cell(encrypted, IV=init_vector, ctype="relay connect")
+        sending_cell.ip_addr = intermediate_servers[1].ip_addr
         sending_cell.port = intermediate_servers[1].port
-        sending_cell = Cell(pickle.dumps(sending_cell), Type="relay")
+        sending_cell = Cell(pickle.dumps(sending_cell), ctype="relay")
         init_vector = os.urandom(16)
 
         cipher = Cipher(
@@ -303,8 +302,8 @@ class Client():
         encryptor = cipher.encryptor()  # encrypt the entire cell
         encrypted = encryptor.update(padder128(pickle.dumps(sending_cell)))
         encrypted += encryptor.finalize()  # finalise encryption.
-        sending_cell = Cell(encrypted, IV=init_vector, Type="relay")
-        sending_cell.ip = intermediate_servers[0].ip
+        sending_cell = Cell(encrypted, IV=init_vector, ctype="relay")
+        sending_cell.ip_addr = intermediate_servers[0].ip_addr
         sending_cell.port = intermediate_servers[0].port
         try:
             sock = intermediate_servers[0].socket
@@ -328,7 +327,7 @@ class Client():
                 their_cell = pickle.loads(decrypted)
                 counter += 1
                 their_cell = pickle.loads(their_cell.payload)
-            if (their_cell.type == their_cell._Types[3]):
+            if their_cell.type == CellType.FAILED:
                 if DEBUG:
                     print("FAILED AT CONNECTION!")
                 return
@@ -362,7 +361,7 @@ class Client():
                 info=None,
                 backend=default_backend()
                 ).derive(shared_key)
-            self.serverList.append(
+            self.server_list.append(
                 Server(gonnect, sock, derived_key, ec_privkey, rsa_key, gonnectport))
             #print("connected successfully to server @ " + gonnect + "   Port: " + str(gonnectport))
         except error:
@@ -375,17 +374,17 @@ class Client():
         # public key list will have to be accessed in order with list of servers.
         # number between is to know when to stop i guess.
         # connection type. exit node always knows
-        sending_cell = Cell(request, Type="Req")
+        sending_cell = Cell(request, ctype="Req")
         init_vector = os.urandom(16)
         cipher = Cipher(algorithms.AES(intermediate_servers[2].key), modes.CBC(init_vector),
                         backend=default_backend())  # 256 bit length cipher lel
         encryptor = cipher.encryptor()  # encrypt the entire cell
         encrypted = encryptor.update(padder128(pickle.dumps(sending_cell)))
         encrypted += encryptor.finalize()  # finalise encryption.
-        sending_cell = Cell(encrypted, IV=init_vector, Type="relay")
-        sending_cell.ip = intermediate_servers[2].ip
+        sending_cell = Cell(encrypted, IV=init_vector, ctype="relay")
+        sending_cell.ip_addr = intermediate_servers[2].ip_addr
         sending_cell.port = intermediate_servers[2].port
-        sending_cell = Cell(pickle.dumps(sending_cell), Type="relay")
+        sending_cell = Cell(pickle.dumps(sending_cell), ctype="relay")
 
         init_vector = os.urandom(16)
         cipher = Cipher(algorithms.AES(intermediate_servers[1].key), modes.CBC(init_vector),
@@ -393,10 +392,10 @@ class Client():
         encryptor = cipher.encryptor()  # encrypt the entire cell
         encrypted = encryptor.update(padder128(pickle.dumps(sending_cell)))
         encrypted += encryptor.finalize()  # finalise encryption.
-        sending_cell = Cell(encrypted, IV=init_vector, Type="relay")
-        sending_cell.ip = intermediate_servers[1].ip
+        sending_cell = Cell(encrypted, IV=init_vector, ctype="relay")
+        sending_cell.ip_addr = intermediate_servers[1].ip_addr
         sending_cell.port = intermediate_servers[1].port
-        sending_cell = Cell(pickle.dumps(sending_cell), Type="relay")
+        sending_cell = Cell(pickle.dumps(sending_cell), ctype="relay")
         init_vector = os.urandom(16)
 
         cipher = Cipher(algorithms.AES(intermediate_servers[0].key), modes.CBC(init_vector),
@@ -404,8 +403,8 @@ class Client():
         encryptor = cipher.encryptor()  # encrypt the entire cell
         encrypted = encryptor.update(padder128(pickle.dumps(sending_cell)))
         encrypted += encryptor.finalize()  # finalise encryption.
-        sending_cell = Cell(encrypted, IV=init_vector, Type="relay")
-        sending_cell.ip = intermediate_servers[0].ip
+        sending_cell = Cell(encrypted, IV=init_vector, ctype="relay")
+        sending_cell.ip_addr = intermediate_servers[0].ip_addr
         sending_cell.port = intermediate_servers[0].port
         try:
             sock = intermediate_servers[0].socket
@@ -435,7 +434,7 @@ class Client():
                 if counter < len(intermediate_servers):
                     their_cell = pickle.loads(their_cell.payload)
 
-            if their_cell.type == their_cell._Types[3]:
+            if their_cell.type == CellType.FAILED:
                 if DEBUG:
                     print("FAILED AT CONNECTION!")
                 return
@@ -455,15 +454,15 @@ class Client():
             print("socketerror")
 
 
-
 def main():
+    """Main function"""
     my_client = Client()
     given_args = sys.argv
 
     if len(given_args) == 11:
-        # TODO - refactor and use argument parsers. See https://docs.python.org/3/library/argparse.html
-
-        for i in range(len(given_args)):
+        # TODO - refactor and use argument parsers.
+        # See https://docs.python.org/3/library/argparse.html
+        for i in enumerate(given_args):
             if given_args[i] == "localhost":
                 given_args[i] = socket.gethostbyname(socket.gethostname())
 
@@ -483,18 +482,20 @@ def main():
         public_key = serialization.load_pem_public_key(
             temp_open.read(), backend=default_backend())
         temp_open.close()
-        my_client.more_connect_1(given_args[4], given_args[5], my_client.serverList, public_key)
+        my_client.more_connect_1(given_args[4], given_args[5],
+                                 my_client.server_list, public_key)
 
         temp_open = open("publics/publictest" + given_args[9] + ".pem", "rb")
         public_key = serialization.load_pem_public_key(
             temp_open.read(), backend=default_backend())
         temp_open.close()
-        my_client.more_connect_2(given_args[7], given_args[8], my_client.serverList, public_key)
+        my_client.more_connect_2(given_args[7], given_args[8],
+                                 my_client.server_list, public_key)
 
-        my_client.req(given_args[10], my_client.serverList)
+        my_client.req(given_args[10], my_client.server_list)
     else:
         print("insufficient arguments\n"
-              + "<Server 1 IP> <Server 1 Port> <key 1 number> " 
+              + "<Server 1 IP> <Server 1 Port> <key 1 number> "
               + "<Server 2 IP> <Server 2 Port> <key 2 number> "
               + "<Server 3 IP> <Server 3 Port> <key 3 number> <Website>\n"
               + "if localhost is IP, just leave it as localhost")

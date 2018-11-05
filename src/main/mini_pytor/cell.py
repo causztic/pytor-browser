@@ -1,43 +1,26 @@
 """Cell class definition"""
+from enum import Enum
+
+class CellType(Enum):
+    """Cell type enum"""
+    ADD_CON = 0
+    REQ = 1
+    CONNECT_RESP = 2
+    FAILED = 3
+    RELAY_CONNECT = 4
+    RELAY = 5
+    GIVE_DIRECT = 6
+    GET_DIRECT = 7
+    CHECKUP = 8
 
 class Cell():
     """Cell class"""
-    _Types = [
-        "AddCon",
-        "Req",
-        "ConnectResp",
-        "FAILED",
-        "relay connect",
-        "relay",
-        "giveDirect",
-        "getDirect",
-        "checkup"
-    ]
-
-    def __init__(self, payload, IV=None, salt=None, signature=None, Type=None):
+    def __init__(self, payload, IV=None, salt=None, signature=None, ctype=None):
         self.payload = payload
         self.signature = signature
-        self.IV = IV  # save the IV since it's a connection cell.
+        self.init_vector = IV  # save the IV since it's a connection cell.
         self.salt = salt
-        if (Type is not None):
-            if (Type == "failed"):
-                self.type = self._Types[3]  # indicates failure
-            elif(Type == "relay connect"):
-                # indicates to make a connection to a new server.
-                self.type = self._Types[4]
-            elif (Type == "AddCon"):
-                # is a connection request. so essentially some key is being pushed out here.
-                self.type = self._Types[0]
-            elif (Type == "Req"):
-                # is a plain request. so essentially some key is being pushed out here.
-                self.type = self._Types[1]
-            elif (Type == "ConnectResp"):
-                self.type = self._Types[2]  # is a response to a connection
-            elif(Type == "relay"):
-                self.type = self._Types[5]  # indicates relay
-            elif (Type == "giveDirect"):
-                self.type = self._Types[6]  # indicates relay
-            elif (Type == "getDirect"):
-                self.type = self._Types[7]  # indicates relay
-            elif (Type == "checkup"):
-                self.type = self._Types[8]  # indicates relay
+        if ctype is None:
+            raise Exception("SHIT GONE WRONG!")
+        elif isinstance(ctype, CellType):
+            self.type = ctype
