@@ -141,12 +141,14 @@ class Server():
                         print("Rejected one connection")
                         continue
 
-                    print("decrypted cell with actual keys.")
-                    print(obtained_cell)
+                    if SERVER_DEBUG:
+                        print("Decrypted cell with actual keys.")
+                        print(obtained_cell)
                     # i.e grab the cell that was passed forward.
                     obtained_cell = pickle.loads(obtained_cell)
-                    print("after pickle load")
-                    print(obtained_cell)
+                    if SERVER_DEBUG:
+                        print("after pickle load")
+                        print(obtained_cell)
                     if obtained_cell.type != CellType.ADD_CON:
                         break  # it was not a connection request.
                     # obtain the generated public key, and the derived key.
@@ -156,8 +158,8 @@ class Server():
                         client_sock, derived_key, generated_privkey)
                     self.CLIENTS.append(client_class)
                     self.CLIENT_SOCKS.append(client_sock)
-                    print(client_class.sock.getpeername())
-                    print("Connected to ONE client.\n\n\n")
+                    client_name = client_class.sock.getpeername()
+                    print(f"Connected to client:{client_name}\n\n\n")
 
                 # error is socket error here.
                 except (struct.error, ConnectionResetError, socket.timeout):
@@ -187,7 +189,8 @@ class Server():
                     self.CLIENT_SOCKS.remove(i)
                     self.CLIENTS.remove(sending_client)
                     continue
-                print("existing")
+                if SERVER_DEBUG:
+                    print("existing")
                 # received_data = self.decrypt(received)
                 gotten_cell = pickle.loads(received)
                 derived_key = sending_client.key  # take his derived key
@@ -200,7 +203,8 @@ class Server():
                 decrypted = decryptor.update(gotten_cell.payload)
                 decrypted += decryptor.finalize()
                 cell_to_next = pickle.loads(decrypted)
-                print(cell_to_next.type)
+                if SERVER_DEBUG:
+                    print(f"Cell type: {cell_to_next.type}")
                 # is a request for a relay connect
                 if cell_to_next.type == CellType.RELAY_CONNECT:
                     try:
@@ -208,16 +212,18 @@ class Server():
                         sock = socket.socket(
                             socket.AF_INET, socket.SOCK_STREAM)
                         sock.connect((cell_to_next.ip_addr, cell_to_next.port))
-                        print((cell_to_next.ip_addr, cell_to_next.port))
-                        print("cell to next")
-                        print(decrypted)
-                        print("payload")
-                        print(cell_to_next.payload)
+                        if SERVER_DEBUG:
+                            print((cell_to_next.ip_addr, cell_to_next.port))
+                            print("cell to next")
+                            print(decrypted)
+                            print("payload")
+                            print(cell_to_next.payload)
                         # send over the cell payload
                         sock.send(cell_to_next.payload)
                         their_cell = sock.recv(4096)  # await answer
-                        print("got values")
-                        print(their_cell)
+                        if SERVER_DEBUG:
+                            print("got values")
+                            print(their_cell)
                         init_vector = os.urandom(16)
                         cipher = Cipher(
                             algorithms.AES(derived_key),
@@ -251,7 +257,7 @@ class Server():
                             sending_client.bounce_ip = cell_to_next.ip_addr
                             sending_client.bounce_port = cell_to_next.port
                             sending_client.bounce_socket = sock
-                            print("connection success.\n\n\n\n\n")
+                            print("Connection success.\n\n\n\n\n")
                     except (ConnectionRefusedError, ConnectionResetError,
                             ConnectionAbortedError, struct.error,
                             socket.timeout):

@@ -1,6 +1,7 @@
 """Cell class definition"""
 from enum import Enum
 
+
 class CellType(Enum):
     """Cell type enum"""
     ADD_CON = 0
@@ -13,8 +14,10 @@ class CellType(Enum):
     GET_DIRECT = 7
     CHECKUP = 8
 
+
 class Cell():
     """Cell class"""
+
     def __init__(self, payload, IV=None, salt=None, signature=None, ctype=None):
         self.payload = payload
         self.signature = signature

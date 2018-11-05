@@ -40,7 +40,7 @@ def main():
             _ = serialization.load_pem_private_key(
                 key_file.read(), password=None, backend=default_backend())
             key_file.close()
-        with open("publics/publictest"+str(i)+".pem", "rb") as key_file:
+        with open("publics/publictest" + str(i) + ".pem", "rb") as key_file:
             _ = serialization.load_pem_public_key(
                 key_file.read(), backend=default_backend())
             key_file.close()
