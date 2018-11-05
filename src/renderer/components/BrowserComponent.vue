@@ -17,11 +17,13 @@
 </template>
 
 <script>
+  import fs from "fs";
+
   export default {
     name: "browser-component",
     data() {
       return {
-        initialHTML: require(`${__static}/503.html`)
+        initialHTML: require('../503.html'),
       }
     }
   }
