@@ -76,11 +76,11 @@
         <i class="fa fa-sync" aria-hidden="true"></i>
       </div>
       <div id="omnibox">
-        <input type="text" id="url">
+        <input v-model="url" type="text" id="url" @keyup.enter="navigate">
       </div>
       <SettingsComponent />
     </nav>
-    <BrowserComponent />
+    <BrowserComponent v-bind:url="url" v-bind:fired.sync="fired" />
     <LoadingComponent />
   </div>
 </template>
@@ -93,6 +93,16 @@
   export default {
     name: 'app',
     components: { LoadingComponent, SettingsComponent, BrowserComponent },
-
+    data() {
+      return {
+        url: "https://www.motherfuckingwebsite.com",
+        fired: false,
+      }
+    },
+    methods: {
+      navigate: function () {
+        this.fired = true;
+      }
+    }
   }
 </script>

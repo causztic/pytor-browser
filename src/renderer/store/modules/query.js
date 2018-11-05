@@ -1,53 +1,52 @@
-import { spawn } from "child_process";
+import { spawnClient } from "common/util";
 
 // initial state
 const state = {
   history: [],
-  response: undefined,
-  status: undefined
-}
+  response: null,
+  status: null
+};
 
 // getters
-const getters = {
-}
+const getters = {};
 
 // actions
 const actions = {
-  getWebsite ({ commit, _}, website) {
-    // spawn background nodes for simulation.
-    const result = spawn('python ../../mini_pytor/client.py',
-      ['localhost', '45000', '0', // server a
-       'localhost', '45001', '1', // server b
-       'localhost', '45002', '2', // server c
-      website]);
+  getWebsite({ dispatch, commit }, website) {
+    dispatch('status/load', null, { root: true });
+    commit("setResponse", null);
+    const result = spawnClient(website);
 
-      result.stdout.on('data', (data) => {
-        console.log(`stdout: ${data}`);
+    console.log(result);
 
-        commit('addQueryToHistory', website);
-        commit('setResponse', data);
-      });
+    result.stdout.on("data", data => {
+      console.log(`stdout: ${data}`);
 
-      result.stderr.on('data', (data) => {
-        console.log(`stderr: ${data}`);
-        commit('setResponse', null);
-      });
+      commit("addQueryToHistory", website);
+      commit("setResponse", data);
+    });
 
-      result.on('close', (code) => {
-        console.log(`child process exited with code ${code}`);
-      });
+    result.stderr.on("data", data => {
+      console.log(`stderr: ${data}`);
+      commit("setResponse", null);
+    });
+
+    result.on("close", code => {
+      console.log(`child process exited with code ${code}`);
+      dispatch('status/connected', null, { root: true });
+    });
   }
-}
+};
 
 // mutations
 const mutations = {
-  addQueryToHistory (state, website) {
+  addQueryToHistory(state, website) {
     state.history.push(website);
   },
-  setResponse (state, response) {
+  setResponse(state, response) {
     state.response = response;
   }
-}
+};
 
 export default {
   namespaced: true,
@@ -55,4 +54,4 @@ export default {
   getters,
   actions,
   mutations
-}
+};

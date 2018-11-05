@@ -3,8 +3,6 @@
 import { app, BrowserWindow } from "electron";
 import * as path from "path";
 import { format as formatUrl } from "url";
-import { spawn } from "child_process";
-
 import { isDevelopment } from "common/util";
 
 // global reference to mainWindow (necessary to prevent window from being garbage collected)
@@ -65,8 +63,4 @@ app.on("activate", () => {
 // create main BrowserWindow when electron is ready
 app.on("ready", () => {
   mainWindow = createMainWindow();
-  // spawn background nodes for simulation.
-  spawn('python ./mini_pytor/server.py', ['a']);
-  spawn('python ./mini_pytor/server.py', ['b']);
-  spawn('python ./mini_pytor/server.py', ['c']);
 });
