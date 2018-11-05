@@ -3,6 +3,7 @@
 import Vue from 'vue';
 import * as vClickOutside from 'v-click-outside-x';
 
+import store from './store';
 import App from "./App.vue";
 
 const style = document.createElement("link");
@@ -14,6 +15,7 @@ Vue.use(vClickOutside);
 
 new Vue({
   el: "#app",
+  store,
   data: {
     versions: {
       electron: process.versions.electron,

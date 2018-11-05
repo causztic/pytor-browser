@@ -8,7 +8,12 @@
 
 ## Setup
 ```bash
-git clone https://github.com/Skool-handle/MiniPyTor
 yarn install
+wget https://github.com/Skool-handle/MiniPyTor/archive/master.zip
+# extract the zip contents and place them in src/renderer/mini_pytor
+```
+
+## Running
+```
 yarn dev
 ```

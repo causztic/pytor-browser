@@ -92,6 +92,7 @@
 
   export default {
     name: 'app',
-    components: { LoadingComponent, SettingsComponent, BrowserComponent }
+    components: { LoadingComponent, SettingsComponent, BrowserComponent },
+
   }
 </script>
