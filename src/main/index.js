@@ -45,6 +45,17 @@ function createMainWindow() {
   return window;
 }
 
+let pids = []
+require('electron').ipcMain.on('pid-msg', (event, arg) => {
+  pids.push(arg);
+});
+
+app.on('before-quit', () => {
+  pids.forEach(pid => {
+    require('ps-node').kill(pid); 
+  });
+});
+
 // quit application when all windows are closed
 app.on("window-all-closed", () => {
   // on macOS it is common for applications to stay open until the user explicitly quits
