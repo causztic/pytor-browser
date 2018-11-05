@@ -5,9 +5,20 @@ import { spawn } from "child_process";
 const isDevelopment = process.env.NODE_ENV !== "production";
 const staticPath = isDevelopment ? __static : __dirname.replace(/app\.asar$/, 'static');
 const spawnServers = () => {
-  spawn('python', ['./mini_pytor/server.py', 'a'], { cwd: __dirname });
-  spawn('python', ['./mini_pytor/server.py', 'b'], { cwd: __dirname });
-  spawn('python', ['./mini_pytor/server.py', 'c'], { cwd: __dirname });
+  for (let instance of ['a', 'b', 'c']) {
+    const serverInstance = spawn('python', ['./mini_pytor/server.py', instance], { cwd: __dirname });
+    serverInstance.stdout.on('data', (data) => {
+      console.log(`stdout: ${data}`);
+    });
+
+    serverInstance.stderr.on('data', (data) => {
+      console.log(`stderr: ${data}`);
+    });
+
+    serverInstance.on('close', (code) => {
+      console.log(`child process exited with code ${code}`);
+    });
+  }
 }
 const spawnClient  = (website) => {
   return spawn('python',
