@@ -397,7 +397,8 @@ def main():
             port = 45002
             identity = 2
     else:
-        print("Usage: python Server.py #port")
+        print("Usage: python server.py [port]")
+        return
 
     server = Server(int(port), identity)
     print("Started server on %d with identity %d" % (port, identity))
