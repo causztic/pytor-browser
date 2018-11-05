@@ -90,8 +90,8 @@
 </template>
 
 <script>
-  import LoadingComponent from './LoadingComponent.vue';
-  import SettingsComponent from './SettingsComponent.vue';
+  import LoadingComponent from './components/LoadingComponent.vue';
+  import SettingsComponent from './components/SettingsComponent.vue';
 
   export default {
     name: 'app',

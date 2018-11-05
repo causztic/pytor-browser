@@ -1,12 +1,16 @@
 "use strict";
 
 import Vue from 'vue';
+import * as vClickOutside from 'v-click-outside-x';
+
 import App from "./App.vue";
-// <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.4.2/css/all.css" integrity="sha384-/rXc/GQVaYpyDdyxK+ecHPVYJSN9bmVFBvjA/9eOB+pb3F2w2N6fc5qB9Ew5yIns" crossorigin="anonymous">
+
 const style = document.createElement("link");
 style.setAttribute("rel", "stylesheet");
 style.setAttribute("href", "https://use.fontawesome.com/releases/v5.4.2/css/all.css");
 document.head.appendChild(style);
+
+Vue.use(vClickOutside);
 
 new Vue({
   el: "#app",
@@ -18,5 +22,5 @@ new Vue({
   },
   components: { App },
   template: `<App />`
-})
+});
 

@@ -16,7 +16,7 @@
 </style>
 
 <template>
-  <div>
+  <div v-click-outside="hideMenuIfVisible">
     <div id="options" :class="activeClass" v-on:click="toggleMenu">
       <i class="fa fa-ellipsis-v" aria-hidden="true"></i>
     </div>
@@ -42,6 +42,12 @@
           this.activeClass = 'action-button active';
         else
           this.activeClass = 'action-button';
+      },
+      hideMenuIfVisible() {
+        if (this.showMenu) {
+          this.activeClass = 'action-button';
+          this.showMenu = false;
+        }
       },
     }
   }
