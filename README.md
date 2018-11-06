@@ -1,6 +1,6 @@
 ![logo](src/renderer/onion.png)
 # PyTor Browser
-A simple demonstration of onion-routing done in Python.
+A simple demonstration of onion-routing done in Python and Electron/NodeJS.
 
 ## Pre-Requisites
 - Yarn
