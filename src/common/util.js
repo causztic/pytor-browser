@@ -17,13 +17,15 @@ const spawnServers = () => {
 };
 
 const spawnClient = (website) => {
-  const clientInstance = spawn('python',
+  const clientInstance = spawn(
+    'python',
     ['./mini_pytor/client.py',
       'localhost', '45000', '0', // server a
       'localhost', '45001', '1', // server b
       'localhost', '45002', '2', // server c
       website],
-    { cwd: __dirname });
+    { cwd: __dirname },
+  );
   electron.ipcRenderer.send('pid-msg', clientInstance.pid);
   return clientInstance;
 };

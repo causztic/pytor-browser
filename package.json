@@ -20,19 +20,19 @@
   },
   "devDependencies": {
     "css-loader": "^1.0.1",
+    "electron": "^3.0.7",
     "electron-builder": "^20.31.1",
     "electron-webpack": "^2.3.1",
     "electron-webpack-vue": "^2.2.1",
-    "eslint": "^5.3.0",
+    "eslint": "^5.8.0",
     "eslint-config-airbnb-base": "^13.1.0",
     "eslint-plugin-import": "^2.14.0",
     "html-loader": "^0.5.5",
     "node-sass": "^4.9.4",
     "sass-loader": "^7.1.0",
-    "webpack": "^4.23.1",
     "v-click-outside-x": "^3.5.0",
     "vue": "^2.5.17",
     "vuex": "^3.0.1",
-    "electron": "^3.0.7"
+    "webpack": "^4.23.1"
   }
 }
