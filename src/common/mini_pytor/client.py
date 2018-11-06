@@ -17,10 +17,10 @@ from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives import hashes
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from util import padder128, CLIENT_DEBUG
 from cell import Cell, CellType
-
+import argparse
 
 class relay():
     """relay class"""
@@ -132,8 +132,7 @@ class Client():
                     print("connected successfully to relay @ " + gonnect
                           + "   Port: " + str(gonnectport))
                 self.relay_LIST.append(
-                    relay(gonnect, sock, derived_key,
-                           ec_privkey, rsa_key_public, gonnectport))
+                    relay(gonnect, sock, derived_key, ec_privkey, rsa_key_public, gonnectport))
                 return   # a relay item is created.
             except InvalidSignature:
                 if CLIENT_DEBUG:
@@ -324,7 +323,7 @@ class Client():
                 print(their_cell.payload)
             counter = 0
             while counter < len(intermediate_relays):
-                print(their_cell.payload)
+                # print(their_cell.payload)
                 cipher = Cipher(
                     algorithms.AES(intermediate_relays[counter].key),
                     modes.CBC(their_cell.init_vector),
@@ -336,7 +335,7 @@ class Client():
                 if CLIENT_DEBUG:
                     print(decrypted)
                 their_cell = pickle.loads(decrypted)
-                print(their_cell.payload)
+                # print(their_cell.payload)
                 counter += 1
                 if counter < len(intermediate_relays):
                     their_cell = their_cell.payload
@@ -347,9 +346,9 @@ class Client():
                 return
             # this cell isn't encrypted. Extract the signature to verify
             their_cell = pickle.loads(their_cell.payload)
-            print("new")
-            print(their_cell.signature)
-            print(their_cell.payload)
+            # print("new")
+            # print(their_cell.signature)
+            # print(their_cell.payload)
 
             signature = their_cell.signature
             their_cell.signature = None
@@ -387,7 +386,6 @@ class Client():
 
     def req(self, request, intermediate_relays):
         """send out stuff in router."""
-        print("REQUESTING")
         if CLIENT_DEBUG:
             print("REQUEST SENDING TEST")
         # must send IV and a cell that is encrypted with the next public key
@@ -462,7 +460,8 @@ class Client():
                     print("FAILED AT CONNECTION!")
                 return
             elif their_cell.type == CellType.CONTINUE:
-                print("got a continue!")
+                if CLIENT_DEBUG:
+                    print("Information is being Streamed. ")
                 summation = their_cell.payload
                 while their_cell.type == CellType.CONTINUE:
                     their_cell = sock.recv(8192)  # await answer
@@ -492,14 +491,15 @@ class Client():
                     summation += their_cell.payload
                 response = bytes(summation)
                 response = pickle.loads(response)
-                print(type(response))
                 if isinstance(response, requests.models.Response):
-                    # print(response.content)
-                    # print(response.status_code)
-                    # return_dict = {"content": response.content.decode(
-                    #    response.encoding), "status code": response.status_code}
-                    # print(json.dumps(return_dict))
-                    print(response.json())
+                    if CLIENT_DEBUG:
+                        print(response.content)
+                        print(response.status_code)
+                    return_dict = {"content": response.content.decode(
+                        response.encoding), "status code": response.status_code}
+                    print(json.dumps(return_dict))
+                    # print(response.json())
+                    return response
 
                 else:
                     # TODO - the error code should be specific to our implementation, not generic ones
@@ -509,26 +509,30 @@ class Client():
             else:
                 response = pickle.loads(their_cell.payload)
                 if isinstance(response, requests.models.Response):
-                    # print(response.content)
-                    # print(response.status_code)
-                    # return_dict = {"content": response.content.decode(
-                    #    response.encoding), "status code": response.status_code}
-                    # print(json.dumps(return_dict))
-                    print(response.json())
+                    if CLIENT_DEBUG:
+                        print(response.content)
+                        print(response.status_code)
+                    return_dict = {"content": response.content.decode(
+                        response.encoding), "status code": response.status_code}
+                    print(json.dumps(return_dict))
+                    return response
                 else:
                     # TODO - the error code should be specific to our implementation, not generic ones
                     # e.g. node offline, decryption failure etc etc
                     print(json.dumps({"content": "", "status": 404}))
+
         except struct.error:
             print("socketerror")
 
 
-def main():
-    """Main function"""
-    my_client = Client()
-    given_args = sys.argv
-    given_args = ["client.py","localhost","45000","0","localhost","45001","1","localhost","45002","2","https://twitter.com"]
-    if len(given_args) == 11:
+class Responder(BaseHTTPRequestHandler):
+    def do_GET(self):
+        my_client = Client()
+        print("get")
+        print(self.path)
+        # given_args = sys.argv
+        given_args = ["client.py", "localhost", "45000", "0", "localhost", "45001", "1", "localhost", "45002", "2",
+                      ]
         # TODO - refactor and use argument parsers.
         # See https://docs.python.org/3/library/argparse.html
         for i, _ in enumerate(given_args):
@@ -538,9 +542,8 @@ def main():
         given_args[2] = int(given_args[2])
         given_args[5] = int(given_args[5])
         given_args[8] = int(given_args[8])
-
-        pem_prefix = "./mini_pytor/publics/publictest"
-        pem_prefix="publics/publictest" ##### ADDDDDED
+        # pem_prefix = "./mini_pytor/publics/publictest"
+        pem_prefix = "publics/publictest"  # #### ADDDDDED
 
         # set up static chain.
         # TODO - get the client to query a directory for the relay keys instead of manually getting
@@ -564,13 +567,25 @@ def main():
         my_client.more_connect_2(given_args[7], given_args[8],
                                  my_client.relay_LIST, public_key)
 
-        my_client.req(given_args[10], my_client.relay_LIST)
-    else:
+        obtained_response = my_client.req(self.path[2:], my_client.relay_LIST)
+        self.send_response(200)
+        self.send_header('Content-type', 'text/html')
+        self.end_headers()
+        self.wfile.write(bytes(obtained_response.content))
+
+
+def main():
+    """Main function"""
+    server_address = ('', 27182)
+    httpd = HTTPServer(server_address, Responder)
+    httpd.serve_forever()
+    """else:
         print("insufficient arguments\n"
               + "<relay 1 IP> <relay 1 Port> <key 1 number> "
               + "<relay 2 IP> <relay 2 Port> <key 2 number> "
               + "<relay 3 IP> <relay 3 Port> <key 3 number> <Website>\n"
               + "if localhost is IP, just leave it as localhost")
+    """
 
 
 if __name__ == "__main__":

@@ -40,7 +40,7 @@ class Relay():
     CLIENTS = []
     CLIENT_SOCKS = []
 
-    def __init__(self, port_number, identity):
+    def __init__(self, port_number, identity=None):
         pem_file = os.path.join(
             os.path.dirname(__file__),
             "privates/privatetest" + str(identity) + ".pem"
@@ -178,7 +178,7 @@ class Relay():
                         if k.sock == i:
                             sending_client = k
                     received = i.recv(4096)
-                    print("got a packet..")
+                    print("got a packet from an existing client")
                     print(received)
                     if not received:
                         raise ConnectionResetError
@@ -191,8 +191,6 @@ class Relay():
                     self.CLIENT_SOCKS.remove(i)
                     self.CLIENTS.remove(sending_client)
                     continue
-                if RELAY_DEBUG:
-                    print("existing")
                 # received_data = self.decrypt(received)
                 gotten_cell = pickle.loads(received)
                 derived_key = sending_client.key  # take his derived key
@@ -237,7 +235,8 @@ class Relay():
                             encrypted = encryptor.update(padder128(
                                 pickle.dumps(Cell("", ctype=CellType.FAILED))))
                             encrypted += encryptor.finalize()
-                            print("sent failed")
+                            if RELAY_DEBUG:
+                                print("sent failed")
                             i.send(pickle.dumps(Cell(
                                 encrypted,
                                 IV=init_vector,
@@ -250,7 +249,8 @@ class Relay():
                                 )))
                             )
                             encrypted += encryptor.finalize()
-                            print("sent valid response")
+                            if RELAY_DEBUG:
+                                print("sent valid response")
                             i.send(pickle.dumps(Cell(
                                 encrypted,
                                 IV=init_vector,
@@ -294,11 +294,12 @@ class Relay():
                     if sending_client.bounce_socket is None:  # check if there is bounce socket
                         return
                     sock = sending_client.bounce_socket
-                    print("bouncing cell's decrypted..")
-                    print(decrypted)
-                    print("payload")
-                    print(cell_to_next.payload)
-                    print(cell_to_next.type)
+                    if RELAY_DEBUG:
+                        print("bouncing cell's decrypted..")
+                        print(decrypted)
+                        print("payload")
+                        print(cell_to_next.payload)
+                        print(cell_to_next.type)
                     sock.send(cell_to_next.payload)  # send over the cell
                     while True:
                         try:
@@ -306,8 +307,9 @@ class Relay():
                         except socket.timeout:
                             their_cell = "request timed out!"
                         their_cell = pickle.loads(their_cell)
-                        print("relay reply received type")
-                        print(their_cell.type)
+                        if RELAY_DEBUG:
+                            print("relay reply received type")
+                            print(their_cell.type)
                         if their_cell.type != CellType.FINISHED:
                             print("got answer back.. as a relay.")
                             # print(len(their_cell))
@@ -331,9 +333,9 @@ class Relay():
                                 IV=init_vector,
                                 ctype=CellType.CONTINUE
                             )))
-                            print("relayed once.")
+                            print("relayed this packet once.")
                         else:
-                            print("got answer back.. as a relay.")
+                            print("received the last packet.")
                             # print(len(their_cell))
                             # print(their_cell)
                             init_vector = os.urandom(16)
@@ -355,7 +357,7 @@ class Relay():
                                 IV=init_vector,
                                 ctype=CellType.FINISHED
                             )))
-                            print("relayed the last one.")
+                            print("relayed the last packet for this communication")
                             break
 
                     print("Relay success.\n\n\n\n\n")
@@ -371,8 +373,7 @@ class Relay():
                                 + "Chrome/70.0.3538.77 Safari/537.36"
                             }
                             req = requests.get(request, headers=header)
-                            print("length of answer")
-                            print(len(req.content))
+                            print("length of answer" + str(len(req.content)))
                         except requests.exceptions.ConnectionError:
                             req = "ERROR"
                             print("Failed to receive response from website")
@@ -399,7 +400,8 @@ class Relay():
                                 encrypted += encryptor.finalize()
                                 i.send(pickle.dumps(
                                     Cell(encrypted, IV=init_vector, ctype=CellType.ADD_CON)))
-                                print("sent once")
+                                if RELAY_DEBUG:
+                                    print("sent one packet")
                                 del payloadbytes[:4096]
                                 time.sleep(10/1000000)
 
@@ -414,7 +416,7 @@ class Relay():
                             encrypted += encryptor.finalize()
                             i.send(pickle.dumps(
                                 Cell(encrypted, IV=init_vector, ctype=CellType.FINISHED)))
-                            print("finished sending")
+                            print("finished sending valid replies.")
                         else:
                             encryptor = cipher.encryptor()
                             encrypted = encryptor.update(
@@ -426,7 +428,7 @@ class Relay():
                             encrypted += encryptor.finalize()
                             i.send(pickle.dumps(
                                 Cell(encrypted, IV=init_vector, ctype=CellType.ADD_CON)))
-                            print("VALID REQUEST REPLIED.")
+                            print("finished sending valid reply.")
 
                     else:
                         init_vector = os.urandom(16)
@@ -448,16 +450,16 @@ class Relay():
                             IV=init_vector,
                             ctype=CellType.ADD_CON
                         )))
-                        print("INVALID REQUEST SENT BACK")
+                        print("INVALID REQUEST REPLIED")
 
 
 def main():
     """Main function"""
     # TODO: use specific identity with a generator or something
-    sys.argv = input("you know the drill. \n")  # added
-    if len(sys.argv) == 1:  # was 2 -> 1
+    # sys.argv = input("you know the drill. \n")  # added for my debug
+    if len(sys.argv) == 2:  # was 2 -> 1
         identity = 3
-        port = sys.argv[0]  # was 1 ->0
+        port = sys.argv[1]  # was 1 ->0
         if port == "a":
             port = 45000
             identity = 0
