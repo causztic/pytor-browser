@@ -15,6 +15,7 @@
     "title": "Pytor Browser"
   },
   "dependencies": {
+    "ps-node": "^0.1.6",
     "source-map-support": "^0.5.9"
   },
   "devDependencies": {
