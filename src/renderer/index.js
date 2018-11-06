@@ -1,3 +1,4 @@
+/* eslint-disable no-undef */
 import Vue from 'vue';
 import * as vClickOutside from 'v-click-outside-x';
 
@@ -11,15 +12,18 @@ document.head.appendChild(style);
 
 Vue.use(vClickOutside);
 
-new Vue({
+const VueInstance = new Vue({
   el: '#app',
   store,
   data: {
     versions: {
       electron: process.versions.electron,
+      // eslint-disable-next-line global-require
       electronWebpack: require('electron-webpack/package.json').version,
     },
   },
   components: { App },
   template: '<App />',
 });
+
+VueInstance();

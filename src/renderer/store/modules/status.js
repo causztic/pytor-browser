@@ -1,4 +1,4 @@
-// initial state
+// eslint-disable-next-line import/no-unresolved
 import { spawnServers } from 'common/util';
 
 const state = {
@@ -21,19 +21,19 @@ const actions = {
       return new Promise((resolve, _) => {
         // TODO: check for server timeouts
         // TODO: update to check for exact server startup
-        for (let instance of instances) {
-          instance.stdout.on('data', data => {
+        instances.forEach((instance) => {
+          instance.stdout.on('data', (data) => {
             console.log(`stdin: ${data}`);
           });
 
-          instance.stderr.on('data', data => {
+          instance.stderr.on('data', (data) => {
             console.log(`stderr: ${data}`);
           });
 
-          instance.on('close', code => {
+          instance.on('close', (code) => {
             console.log(`child process exited with code ${code}`);
           });
-        }
+        });
 
         setTimeout(() => {
           commit('connected');
@@ -41,10 +41,9 @@ const actions = {
         }, 300);
       });
     }
-      return new Promise((resolve, _) => {
-        resolve();
-      });
-
+    return new Promise((resolve, _) => {
+      resolve();
+    });
   },
 };
 
@@ -52,7 +51,7 @@ const mutations = {
   connecting(state) {
     state.message = 'Connecting..';
     state.connectionState = 'connecting';
-    PopStateEvent.connected = false;
+    state.connected = false;
   },
   loading(state) {
     state.message = 'Loading page..';

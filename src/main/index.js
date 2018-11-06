@@ -1,9 +1,10 @@
-'use strict';
-
 import { app, BrowserWindow } from 'electron';
 import * as path from 'path';
 import { format as formatUrl } from 'url';
+// eslint-disable-next-line import/no-unresolved
 import { isDevelopment } from 'common/util';
+
+const psNode = require('ps-node');
 
 // global reference to mainWindow (necessary to prevent window from being garbage collected)
 let mainWindow;
@@ -53,7 +54,7 @@ require('electron').ipcMain.on('pid-msg', (_, arg) => {
 
 app.on('before-quit', () => {
   pids.forEach((pid) => {
-    require('ps-node').kill(pid);
+    psNode.kill(pid);
   });
 });
 
