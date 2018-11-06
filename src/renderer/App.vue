@@ -86,21 +86,21 @@
 </template>
 
 <script>
-  import LoadingComponent from './components/LoadingComponent.vue';
-  import SettingsComponent from './components/SettingsComponent.vue';
-  import BrowserComponent from './components/BrowserComponent.vue';
+  import LoadingComponent from "./components/LoadingComponent.vue";
+  import SettingsComponent from "./components/SettingsComponent.vue";
+  import BrowserComponent from "./components/BrowserComponent.vue";
 
   export default {
-    name: 'app',
+    name: "app",
     components: { LoadingComponent, SettingsComponent, BrowserComponent },
     data() {
       return {
         url: "https://www.motherfuckingwebsite.com",
         fired: false,
-      }
+      };
     },
     methods: {
-      navigate: function () {
+      navigate() {
         this.fired = true;
       }
     }

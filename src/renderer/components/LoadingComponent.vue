@@ -43,18 +43,18 @@
 <template>
   <div class="loading-messages">
     <span>{{ message }}</span>
-    <span id="status" :class="connection_state"></span>
+    <span id="status" :class="connectionState"></span>
   </div>
 </template>
 
 <script>
-  import { mapState, mapActions } from 'vuex';
+  import { mapState, mapActions } from "vuex";
 
   export default {
-    name: 'loading-component',
+    name: "loading-component",
     computed: mapState({
-      connection_state: state => state.status.connection_state,
-      message: state => state.status.message,
+      connectionState: (state) => state.status.connectionState,
+      message: (state) => state.status.message,
     }),
-  }
+  };
 </script>

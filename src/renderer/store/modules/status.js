@@ -4,7 +4,7 @@ import { spawnServers } from "common/util";
 const state = {
   message: "You are not connected to the network.",
   connected: false,
-  connection_state: "not_connected",
+  connectionState: "not_connected",
 };
 
 const actions = {
@@ -22,15 +22,15 @@ const actions = {
         // TODO: check for server timeouts
         // TODO: update to check for exact server startup
         for (let instance of instances) {
-          instance.stdout.on("data", data => {
+          instance.stdout.on("data", (data) => {
             console.log(`stdin: ${data}`);
           });
 
-          instance.stderr.on("data", data => {
+          instance.stderr.on("data", (data) => {
             console.log(`stderr: ${data}`);
           });
 
-          instance.on("close", code => {
+          instance.on("close", (code) => {
             console.log(`child process exited with code ${code}`);
           });
         }
@@ -41,7 +41,7 @@ const actions = {
         }, 300);
       });
     } else {
-      return new Promise((resolve, _) => { resolve() });
+      return new Promise((resolve, _) => { resolve(); });
     }
   }
 };
@@ -49,16 +49,16 @@ const actions = {
 const mutations = {
   connecting(state) {
     state.message = "Connecting..";
-    state.connection_state = "connecting";
+    state.connectionState = "connecting";
     PopStateEvent.connected = false;
   },
   loading(state) {
     state.message = "Loading page..";
-    state.connection_state = "connecting";
+    state.connectionState = "connecting";
   },
   connected(state) {
     state.message = "Connected to network.";
-    state.connection_state = "connected";
+    state.connectionState = "connected";
     state.connected = true;
   }
 };

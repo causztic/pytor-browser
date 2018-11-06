@@ -1,9 +1,9 @@
 "use strict";
 
-import Vue from 'vue';
-import * as vClickOutside from 'v-click-outside-x';
+import Vue from "vue";
+import * as vClickOutside from "v-click-outside-x";
 
-import store from './store';
+import store from "./store";
 import App from "./App.vue";
 
 const style = document.createElement("link");
@@ -23,6 +23,6 @@ new Vue({
     }
   },
   components: { App },
-  template: `<App />`
+  template: "<App />"
 });
 

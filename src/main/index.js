@@ -7,6 +7,7 @@ import { isDevelopment } from "common/util";
 
 // global reference to mainWindow (necessary to prevent window from being garbage collected)
 let mainWindow;
+let pids = [];
 
 function createMainWindow() {
   const window = new BrowserWindow({
@@ -27,9 +28,9 @@ function createMainWindow() {
     );
   }
 
-  window.once('ready-to-show', () => {
+  window.once("ready-to-show", () => {
     window.show();
-  })
+  });
 
   window.on("closed", () => {
     mainWindow = null;
@@ -45,14 +46,14 @@ function createMainWindow() {
   return window;
 }
 
-let pids = []
-require('electron').ipcMain.on('pid-msg', (event, arg) => {
+
+require("electron").ipcMain.on("pid-msg", (_, arg) => {
   pids.push(arg);
 });
 
-app.on('before-quit', () => {
+app.on("before-quit", () => {
   pids.forEach(pid => {
-    require('ps-node').kill(pid); 
+    require("ps-node").kill(pid);
   });
 });
 

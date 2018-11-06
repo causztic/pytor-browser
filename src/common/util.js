@@ -7,7 +7,7 @@ const isDevelopment = process.env.NODE_ENV !== "production";
 const staticPath = isDevelopment ? __static : __dirname.replace(/app\.asar$/, "static");
 
 const spawnServers = () => {
-  let instances = []
+  let instances = [];
   for (let instance of ["a", "b", "c"]) {
     const serverInstance = spawn("python", ["./mini_pytor/server.py", instance], { cwd: __dirname });
     instances.push(serverInstance);
