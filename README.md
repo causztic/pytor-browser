@@ -6,7 +6,7 @@ A simple demonstration of onion-routing done in Python and Electron/NodeJS.
 -  Yarn
 -  Any Node LTS (I built it with v11)
 -  Respective system libraries if you are building cross platform,
-    see electron-builder's [documentation](https://www.electron.build/multi-platform-build).
+     see electron-builder's [documentation](https://www.electron.build/multi-platform-build).
 -  Python 3.6.5 (preferably with pyenv) and corresponding Pip
 
 ## Setup
