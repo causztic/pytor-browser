@@ -1,17 +1,17 @@
-"use strict";
+'use strict';
 
-import { app, BrowserWindow } from "electron";
-import * as path from "path";
-import { format as formatUrl } from "url";
-import { isDevelopment } from "common/util";
+import { app, BrowserWindow } from 'electron';
+import * as path from 'path';
+import { format as formatUrl } from 'url';
+import { isDevelopment } from 'common/util';
 
 // global reference to mainWindow (necessary to prevent window from being garbage collected)
 let mainWindow;
-let pids = [];
+const pids = [];
 
 function createMainWindow() {
   const window = new BrowserWindow({
-    show: false
+    show: false,
   });
   window.maximize();
 
@@ -21,22 +21,22 @@ function createMainWindow() {
   } else {
     window.loadURL(
       formatUrl({
-        pathname: path.join(__dirname, "index.html"),
-        protocol: "file",
-        slashes: true
-      })
+        pathname: path.join(__dirname, 'index.html'),
+        protocol: 'file',
+        slashes: true,
+      }),
     );
   }
 
-  window.once("ready-to-show", () => {
+  window.once('ready-to-show', () => {
     window.show();
   });
 
-  window.on("closed", () => {
+  window.on('closed', () => {
     mainWindow = null;
   });
 
-  window.webContents.on("devtools-opened", () => {
+  window.webContents.on('devtools-opened', () => {
     window.focus();
     setImmediate(() => {
       window.focus();
@@ -47,25 +47,25 @@ function createMainWindow() {
 }
 
 
-require("electron").ipcMain.on("pid-msg", (_, arg) => {
+require('electron').ipcMain.on('pid-msg', (_, arg) => {
   pids.push(arg);
 });
 
-app.on("before-quit", () => {
-  pids.forEach(pid => {
-    require("ps-node").kill(pid);
+app.on('before-quit', () => {
+  pids.forEach((pid) => {
+    require('ps-node').kill(pid);
   });
 });
 
 // quit application when all windows are closed
-app.on("window-all-closed", () => {
+app.on('window-all-closed', () => {
   // on macOS it is common for applications to stay open until the user explicitly quits
-  if (process.platform !== "darwin") {
+  if (process.platform !== 'darwin') {
     app.quit();
   }
 });
 
-app.on("activate", () => {
+app.on('activate', () => {
   // on macOS it is common to re-create a window even after all windows have been closed
   if (mainWindow === null) {
     mainWindow = createMainWindow();
@@ -73,6 +73,6 @@ app.on("activate", () => {
 });
 
 // create main BrowserWindow when electron is ready
-app.on("ready", () => {
+app.on('ready', () => {
   mainWindow = createMainWindow();
 });

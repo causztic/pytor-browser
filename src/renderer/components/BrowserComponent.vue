@@ -17,12 +17,12 @@
 </template>
 
 <script>
-  import fs from "fs";
-  import { mapState, mapActions } from "vuex";
+  import fs from 'fs';
+  import { mapState, mapActions } from 'vuex';
 
   export default {
-    name: "browser-component",
-    props: ["url", "fired"],
+    name: 'browser-component',
+    props: ['url', 'fired'],
     computed: mapState({
       response: (state) => state.query.response,
       connected: (state) => state.status.connected,
@@ -30,17 +30,17 @@
     watch: {
       fired(newVal, oldVal) {
         if (newVal && this.connected) {
-          this.$store.dispatch("query/getWebsite", this.url);
-          this.$emit("update:fired", false);
+          this.$store.dispatch('query/getWebsite', this.url);
+          this.$emit('update:fired', false);
         }
       }
     },
     created() {
-      Promise.resolve(this.$store.dispatch("status/startServers"));
+      Promise.resolve(this.$store.dispatch('status/startServers'));
     },
     data() {
       return {
-        initialHTML: require("../503.html"),
+        initialHTML: require('../503.html'),
       };
     }
   };

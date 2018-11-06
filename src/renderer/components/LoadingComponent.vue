@@ -48,13 +48,13 @@
 </template>
 
 <script>
-  import { mapState, mapActions } from "vuex";
+  import { mapState, mapActions } from 'vuex';
 
   export default {
-    name: "loading-component",
+    name: 'loading-component',
     computed: mapState({
-      connectionState: (state) => state.status.connectionState,
-      message: (state) => state.status.message,
+      connectionState: state => state.status.connectionState,
+      message: state => state.status.message,
     }),
   };
 </script>
