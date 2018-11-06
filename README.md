@@ -1,5 +1,5 @@
 ![logo](src/renderer/onion.png)
-# PyTor Browser
+# PyTor Browser [![Codacy Badge](https://api.codacy.com/project/badge/Grade/41fa263f875e4d50b5d290a15f5c3d6c)](https://www.codacy.com/app/limyaojie93/pytor-browser?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=causztic/pytor-browser&amp;utm_campaign=Badge_Grade)
 A simple demonstration of onion-routing done in Python and Electron/NodeJS.
 
 ## Pre-Requisites
