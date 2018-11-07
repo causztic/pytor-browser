@@ -1,4 +1,6 @@
 <style lang="scss">
+  @import '~@fortawesome/fontawesome-free/css/all.css';
+
   body {
     margin: 0;
     height: 100vh;

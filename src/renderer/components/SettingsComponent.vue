@@ -27,7 +27,7 @@
 
 <script>
 export default {
-  name: 'settings-component',
+  name: 'SettingsComponent',
   data() {
     return {
       showMenu: false,
