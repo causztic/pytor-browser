@@ -456,11 +456,9 @@ class Client():
 
             response = pickle.loads(their_cell.payload)
             if not isinstance(response, type("")):
-                print(response.content)
-                print(response.status_code)
-                return_dict = {"content": response.content.decode(
-                    response.encoding), "status code": response.status_code}
-                print(json.dumps(return_dict))
+                # TODO - find a better solution than replacing \n
+                return_dict = response.content.decode(response.encoding).replace("\n", "")
+                sys.stdout.write(return_dict)
             else:
                 # TODO - the error code should be specific to our implementation, not generic ones
                 # e.g. node offline, decryption failure etc etc
@@ -479,7 +477,7 @@ def main():
         # See https://docs.python.org/3/library/argparse.html
         for i, _ in enumerate(given_args):
             if given_args[i] == "localhost":
-                given_args[i] = socket.gethostbyname(socket.gethostname())
+                given_args[i] = "127.0.0.1"
 
         given_args[2] = int(given_args[2])
         given_args[5] = int(given_args[5])
