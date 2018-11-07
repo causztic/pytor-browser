@@ -12,7 +12,8 @@ document.head.appendChild(style);
 
 Vue.use(vClickOutside);
 
-const VueInstance = new Vue({
+// eslint-disable-next-line no-new
+new Vue({
   el: '#app',
   store,
   data: {
@@ -24,6 +25,4 @@ const VueInstance = new Vue({
   },
   components: { App },
   template: '<App />',
-});
-
-VueInstance();
+})
