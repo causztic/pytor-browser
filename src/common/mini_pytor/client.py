@@ -34,6 +34,14 @@ class Relay():
         self.port = port
 
 
+class RegisteredRelay():
+    """Relay data class, minus socket."""
+    def __init__(self, ipaddr, portnum, publickey):
+        self.ip = ipaddr
+        self.port = portnum
+        self.key = publickey
+
+
 class Client():
     """Client class"""
 
@@ -49,6 +57,19 @@ class Client():
             encoding=serialization.Encoding.PEM,
             format=serialization.PublicFormat.SubjectPublicKeyInfo
         )
+
+    @staticmethod
+    def getdirectoryitems():
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.connect((socket.gethostbyname(socket.gethostname()), 50000))  # essentially connect to directory
+        sock.send(pickle.dumps(Cell("", ctype=CellType.GET_DIRECT)))
+        print("sent")
+        received_cell = sock.recv(32768)
+        print("recved")
+        received_cell = pickle.loads(received_cell)
+        if isinstance(received_cell.payload, list):
+            print(received_cell.payload)
+        return received_cell.payload
 
     @staticmethod
     def make_first_connect_cell():
@@ -189,25 +210,21 @@ class Client():
                 print(pickle.dumps(sending_cell))
             their_cell = sock.recv(4096)  # await answer
             # you now receive a cell with encrypted payload.
-            counter = len(intermediate_relays) - 1
             their_cell = pickle.loads(their_cell)
-            while counter >= 0:
-                cipher = Cipher(
-                    algorithms.AES(intermediate_relays[counter].key),
-                    modes.CBC(their_cell.init_vector),
-                    backend=default_backend()
-                )
-                decryptor = cipher.decryptor()
-                decrypted = decryptor.update(their_cell.payload)
-                decrypted += decryptor.finalize()  # finalise decryption
-                if CLIENT_DEBUG:
-                    print(decrypted)
+            cipher = Cipher(
+                algorithms.AES(intermediate_relays[0].key),
+                modes.CBC(their_cell.init_vector),
+                backend=default_backend()
+            )
+            decryptor = cipher.decryptor()
+            decrypted = decryptor.update(their_cell.payload)
+            decrypted += decryptor.finalize()  # finalise decryption
+            if CLIENT_DEBUG:
                 print(decrypted)
-                their_cell = pickle.loads(decrypted)
-                counter -= 1
-                if CLIENT_DEBUG:
-                    print(their_cell.payload)
-                their_cell = pickle.loads(their_cell.payload)
+            their_cell = pickle.loads(decrypted)
+            if CLIENT_DEBUG:
+                print(their_cell.payload)
+            their_cell = pickle.loads(their_cell.payload)
             if their_cell.type == CellType.FAILED:
                 if CLIENT_DEBUG:
                     print("FAILED AT CONNECTION!")
@@ -215,7 +232,6 @@ class Client():
                     print("Connection was refused. Is the relay online yet?")
                 return
             # their_cell = pickle.loads(their_cell.payload)
-
             # this cell isn't encrypted. Extract the signature to verify
             signature = their_cell.signature
             their_cell.signature = None
@@ -261,7 +277,6 @@ class Client():
         """must send IV and a cell that is encrypted with the next public key
         public key list will have to be accessed in order with list of relays.
         number between is to know when to stop i guess."""
-
         sending_cell, ec_privkey = Client.make_first_connect_cell()
         sending_cell = pickle.dumps(sending_cell)
         if CLIENT_DEBUG:
@@ -385,13 +400,13 @@ class Client():
         except struct.error:
             print("socket error occurred")
 
-    def req(self, request, intermediate_relays):
+    @staticmethod
+    def req(request, intermediate_relays):
         """send out stuff in router."""
         if CLIENT_DEBUG:
             print("REQUEST SENDING TEST")
         # must send IV and a cell that is encrypted with the next public key
         # public key list will have to be accessed in order with list of relays
-        # number between is to know when to stop i guess.
         # connection type. exit node always knows
         sending_cell = Cell(request, ctype=CellType.REQ)
         init_vector = os.urandom(16)
@@ -537,10 +552,22 @@ class Responder(BaseHTTPRequestHandler):
         print("get")
         print(self.path)
         # given_args = sys.argv
-        given_args = ["client.py", "localhost", "45000", "0", "localhost", "45001", "1", "localhost", "45002", "2",
-                      ]
+        relay_list = my_client.getdirectoryitems()
+        # given_args = ["client.py", "localhost", "45000", "0", "localhost", "45001", "1", "localhost", "45002", "2"]
         # TODO - refactor and use argument parsers.
         # See https://docs.python.org/3/library/argparse.html
+        public_key1 = serialization.load_pem_public_key(
+            relay_list[0].key, backend=default_backend())
+        my_client.first_connect(relay_list[0].ip,relay_list[0].port , public_key1)
+        public_key2 = serialization.load_pem_public_key(
+            relay_list[1].key, backend=default_backend())
+        my_client.more_connect_1(relay_list[1].ip, relay_list[1].port, my_client.relay_LIST , public_key2)
+        public_key3 = serialization.load_pem_public_key(
+            relay_list[2].key, backend=default_backend())
+        my_client.more_connect_2(relay_list[2].ip, relay_list[2].port, my_client.relay_LIST, public_key3)
+        obtained_response = my_client.req(self.path[2:], my_client.relay_LIST)
+
+        """
         for i, _ in enumerate(given_args):
             if given_args[i] == "localhost":
                 given_args[i] = socket.gethostbyname(socket.gethostname())
@@ -574,6 +601,7 @@ class Responder(BaseHTTPRequestHandler):
                                  my_client.relay_LIST, public_key)
 
         obtained_response = my_client.req(self.path[2:], my_client.relay_LIST)
+        """
         self.send_response(obtained_response.status_code)
         self.send_header('Content-type', 'text/html')
         self.end_headers()

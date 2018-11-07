@@ -20,6 +20,14 @@ class Relay():
         self.socket = socketinput
 
 
+class RegisteredRelay():
+    """Relay data class, minus socket."""
+    def __init__(self, ipaddr, portnum, publickey):
+        self.ip = ipaddr
+        self.port = portnum
+        self.key = publickey
+
+
 class DirectoryServer():
     """Directory server class"""
     def __init__(self):
@@ -37,6 +45,7 @@ class DirectoryServer():
         self.lasttime = time.time()
         self.registered_relays = []
         self.identities = []
+        self.relay_sockets=[]
         for i in range(100):
             self.identities.append(i)  # add 1 to 100 for the identities.
         self.connected_relays = []
@@ -51,7 +60,7 @@ class DirectoryServer():
     def mainloop(self):
         while True:
             readready, _, _ = select.select(
-                [self.socket]+self.connected_relays, [], [])
+                [self.socket]+self.relay_sockets, [], [])
             print("obtained a connection.")
             for i in readready:
                 if i == self.socket:  # is receiving a new connection request.
@@ -70,6 +79,7 @@ class DirectoryServer():
                             base_bytearray = receivedcell.salt
                             signature = receivedcell.signature
                             publickey = receivedcell.payload
+                            publickey_bytes = receivedcell.payload
                             portnum = receivedcell.init_vector
                             theirpublickey = serialization.load_pem_public_key(
                                 publickey, backend=default_backend())
@@ -88,14 +98,15 @@ class DirectoryServer():
 
                             ipaddress, portcon = relaysocket.getpeername()  # obtain the ip and port of that server.
                             print("Added-> PORT: "+str(portnum)+" IP: "+str(ipaddress))
-                            self.registered_relays.append(
+                            self.connected_relays.append(
                                 Relay(ipaddress, relaysocket, portnum, theirpublickey))
-                            self.connected_relays.append(relaysocket)
+                            self.registered_relays.append(RegisteredRelay(ipaddress,portnum,publickey_bytes))
+                            self.relay_sockets.append(relaysocket)
 
                         elif receivedcell.type == CellType.GET_DIRECT:
                             print("got a directory request")
-                            relaysocket.setSocketTimeout(0.00003)
-                            relaysocket.send(pickle.dumps(Cell(self.giving_server, ctype=CellType.GET_DIRECT)))
+                            relaysocket.settimeout(0.03)
+                            relaysocket.send(pickle.dumps(Cell(self.registered_relays, ctype=CellType.GET_DIRECT)))
                             # slow timeout for receive. Else, force close. Basically ensure they have obtained list.
                             relaysocket.recv(4096)
                             relaysocket.close()
@@ -105,21 +116,28 @@ class DirectoryServer():
                             # reject connection as it does not contain a valid cell.
                 else:
                     reference = None
-                    print("got from existing.")
+                    print("got something from existing.")
+                    # implies that it is closed though.
                     try:
-                        received = i.recv(4096)
+                        i.recv(4096)
                     except ConnectionError:
-                        for k in self.registered_relays:
+                        for k in self.connected_relays:
                             if k.socket == i:
                                 # i.e it is part of the registered relays list
                                 reference = k
+                        for k in self.registered_relays:
+                            if k.ip==reference.ip and k.port==reference.port:
+                                # i.e it is part of the registered relays list
+                                reference2 = k
+
                         print("relay WAS closed! or timed out.")
                         print("Removed relay with IP: " + str(reference.ip) + " Port: " + str(reference.port))
                         i.close()
                         print("closed connection to relay.")
                         self.registered_relays.remove(reference)
-                        self.connected_relays.remove(i)
-                        continue
+                        self.connected_relays.remove(reference2)
+                        self.relay_sockets.remove(i)
+
 
 
 a = DirectoryServer()
