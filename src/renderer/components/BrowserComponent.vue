@@ -17,31 +17,32 @@
 </template>
 
 <script>
-  import fs from 'fs';
-  import { mapState, mapActions } from 'vuex';
+import { mapState } from 'vuex';
 
-  export default {
-    name: 'browser-component',
-    props: ['url', 'fired'],
-    computed: mapState({
-      response: (state) => state.query.response,
-      connected: (state) => state.status.connected,
-    }),
-    watch: {
-      fired(newVal, oldVal) {
-        if (newVal && this.connected) {
-          this.$store.dispatch('query/getWebsite', this.url);
-          this.$emit('update:fired', false);
-        }
+const initialHTML = require('../503.html');
+
+export default {
+  name: 'BrowserComponent',
+  props: ['url', 'fired'],
+  data() {
+    return {
+      initialHTML,
+    };
+  },
+  computed: mapState({
+    response: state => state.query.response,
+    connected: state => state.status.connected,
+  }),
+  watch: {
+    fired(newVal, _) {
+      if (newVal && this.connected) {
+        this.$store.dispatch('query/getWebsite', this.url);
+        this.$emit('update:fired', false);
       }
     },
-    created() {
-      Promise.resolve(this.$store.dispatch('status/startServers'));
-    },
-    data() {
-      return {
-        initialHTML: require('../503.html'),
-      };
-    }
-  };
+  },
+  created() {
+    Promise.resolve(this.$store.dispatch('status/startServers'));
+  },
+};
 </script>
