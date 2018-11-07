@@ -20,9 +20,9 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from util import padder128, CLIENT_DEBUG
 from cell import Cell, CellType
-import argparse
 
-class relay():
+
+class Relay():
     """relay class"""
 
     def __init__(self, ip, sock, derived_key, ec_key, rsa_key, port):
@@ -36,10 +36,10 @@ class relay():
 
 class Client():
     """Client class"""
-    relay_LIST = []
 
     def __init__(self):
-
+        print("re_init")
+        self.relay_LIST = []
         # generate RSA public private key pair
         self.private_key = rsa.generate_private_key(
             backend=default_backend(), public_exponent=65537, key_size=3072)
@@ -132,7 +132,7 @@ class Client():
                     print("connected successfully to relay @ " + gonnect
                           + "   Port: " + str(gonnectport))
                 self.relay_LIST.append(
-                    relay(gonnect, sock, derived_key, ec_privkey, rsa_key_public, gonnectport))
+                    Relay(gonnect, sock, derived_key, ec_privkey, rsa_key_public, gonnectport))
                 return   # a relay item is created.
             except InvalidSignature:
                 if CLIENT_DEBUG:
@@ -202,6 +202,7 @@ class Client():
                 decrypted += decryptor.finalize()  # finalise decryption
                 if CLIENT_DEBUG:
                     print(decrypted)
+                print(decrypted)
                 their_cell = pickle.loads(decrypted)
                 counter -= 1
                 if CLIENT_DEBUG:
@@ -245,7 +246,7 @@ class Client():
                 backend=default_backend()
             ).derive(shared_key)
             self.relay_LIST.append(
-                relay(gonnect, sock, derived_key, ec_privkey, rsa_key, gonnectport))
+                Relay(gonnect, sock, derived_key, ec_privkey, rsa_key, gonnectport))
             if CLIENT_DEBUG:
                 print("connected successfully to relay @ " + gonnect
                       + "   Port: " + str(gonnectport))
@@ -377,7 +378,7 @@ class Client():
                 backend=default_backend()
             ).derive(shared_key)
             self.relay_LIST.append(
-                relay(gonnect, sock, derived_key, ec_privkey, rsa_key, gonnectport))
+                Relay(gonnect, sock, derived_key, ec_privkey, rsa_key, gonnectport))
             if CLIENT_DEBUG:
                 print("connected successfully to relay @ " + gonnect
                       + "   Port: " + str(gonnectport))
@@ -524,6 +525,11 @@ class Client():
         except struct.error:
             print("socketerror")
 
+    def close(self):
+        for i in self.relay_LIST:
+            i.sock.close()
+        pass
+
 
 class Responder(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -568,10 +574,11 @@ class Responder(BaseHTTPRequestHandler):
                                  my_client.relay_LIST, public_key)
 
         obtained_response = my_client.req(self.path[2:], my_client.relay_LIST)
-        self.send_response(200)
+        self.send_response(obtained_response.status_code)
         self.send_header('Content-type', 'text/html')
         self.end_headers()
         self.wfile.write(bytes(obtained_response.content))
+        my_client.close()
 
 
 def main():

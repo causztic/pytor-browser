@@ -50,9 +50,30 @@ class Relay():
             temp_open.read(), password=None, backend=default_backend())  # used for signing, etc.
         # public key for sending out.
         self.sendingpublickey = self.true_private_key.public_key()
+        # obtain the serialised public key for directory
+        serialised_public_key = self.sendingpublickey.public_bytes(
+
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo)
+        base_bytearray = os.urandom(128)  # generate random bytearray with 128 bytes.
+        signedbytearray= self.true_private_key.sign(
+            base_bytearray,
+            cryptography.hazmat.primitives.asymmetric.padding.PSS(
+                mgf=cryptography.hazmat.primitives.asymmetric.padding.MGF1(
+                    algorithm=hashes.SHA256()),
+                salt_length=cryptography.hazmat.primitives
+                    .asymmetric.padding.PSS.MAX_LENGTH
+            ),
+            hashes.SHA256()
+        )
+        DirectoryCell = Cell(serialised_public_key, signature=signedbytearray,
+                             salt=base_bytearray, IV=port_number, ctype=CellType.GIVE_DIRECT)
+        # store the byte array, signed version, serialised public key, and actual port number for calling.
+        self.directory_socket = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+        self.directory_socket.connect((socket.gethostbyname(socket.gethostname()),50000))
+        self.directory_socket.send(pickle.dumps(DirectoryCell))
         # tcp type chosen for first.
         self.relay_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        # now you have a signature of your own damned public key.
         # better be "" or it'll listen only on localhost
         self.relay_socket.bind(("", port_number))
         self.relay_socket.listen(100)
@@ -456,10 +477,10 @@ class Relay():
 def main():
     """Main function"""
     # TODO: use specific identity with a generator or something
-    # sys.argv = input("you know the drill. \n")  # added for my debug
-    if len(sys.argv) == 2:  # was 2 -> 1
+    sys.argv = input("you know the drill. \n")  # added for my debug
+    if len(sys.argv) == 1:  # was 2 -> 1
         identity = 3
-        port = sys.argv[1]  # was 1 ->0
+        port = sys.argv[0]  # was 1 ->0
         if port == "a":
             port = 45000
             identity = 0

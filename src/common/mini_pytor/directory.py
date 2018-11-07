@@ -11,21 +11,13 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import serialization
 from cell import Cell, CellType
 
-
-class Serverreg():
-    """Server data class"""
-    def __init__(self, ipaddr, port, socketinput, publickey):
-        self.ip = ipaddr
-        self.port = port
-        self.socket = socketinput
-        self.key = publickey
-
 class Relay():
     """Relay data class"""
-    def __init__(self,ipaddr,portnum,publickey):
+    def __init__(self, ipaddr, socketinput, portnum, publickey):
         self.ip = ipaddr
         self.port = portnum
         self.key = publickey
+        self.socket = socketinput
 
 
 class DirectoryServer():
@@ -47,7 +39,7 @@ class DirectoryServer():
         self.identities = []
         for i in range(100):
             self.identities.append(i)  # add 1 to 100 for the identities.
-
+        self.connected_relays = []
         # tcp type chosen for first.
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         # now you have a signature of your own damned public key.
@@ -59,13 +51,14 @@ class DirectoryServer():
     def mainloop(self):
         while True:
             readready, _, _ = select.select(
-                [self.socket], [], [])
+                [self.socket]+self.connected_relays, [], [])
             print("obtained a connection.")
             for i in readready:
                 if i == self.socket:  # is receiving a new connection request.
-                    (serversocket, myport) = readready[0].accept
+                    print("got a connection request.")
+                    (relaysocket, myport) = self.socket.accept()
                     # obtain the data sent over.
-                    obtained = serversocket.recv(4096)
+                    obtained = relaysocket.recv(4096)
                     try:
                         receivedcell = pickle.loads(obtained)
                     except (pickle.PickleError, pickle.PicklingError, pickle.UnpicklingError) as error:
@@ -74,15 +67,15 @@ class DirectoryServer():
                     # ensure it is indeed a cell.
                     if isinstance(receivedcell, Cell):
                         if receivedcell.type == CellType.GIVE_DIRECT:
-                            signedbytearray = receivedcell.salt
+                            base_bytearray = receivedcell.salt
                             signature = receivedcell.signature
                             publickey = receivedcell.payload
-                            portnum = receivedcell.IV
+                            portnum = receivedcell.init_vector
                             theirpublickey = serialization.load_pem_public_key(
                                 publickey, backend=default_backend())
 
                             try:
-                                theirpublickey.verify(signature, signedbytearray,
+                                theirpublickey.verify(signature, base_bytearray,
                                                       cryptography.hazmat.primitives.asymmetric.padding.PSS(
                                                           mgf=cryptography.hazmat.primitives.asymmetric.padding.MGF1(
                                                               hashes.SHA256()),
@@ -90,33 +83,45 @@ class DirectoryServer():
                                                       hashes.SHA256())
                             except InvalidSignature:
                                 # reject. signature validation failed.
-                                serversocket.close()
+                                relaysocket.close()
                                 continue
 
-                            ipaddress, portcon = serversocket.getpeername()  # obtain the ip and port of that server.
+                            ipaddress, portcon = relaysocket.getpeername()  # obtain the ip and port of that server.
+                            print("Added-> PORT: "+str(portnum)+" IP: "+str(ipaddress))
                             self.registered_relays.append(
-                                Serverreg(ipaddress, portnum, serversocket, theirpublickey))
-                            # reply or no reply?
+                                Relay(ipaddress, relaysocket, portnum, theirpublickey))
+                            self.connected_relays.append(relaysocket)
+
                         elif receivedcell.type == CellType.GET_DIRECT:
-                            serversocket.setSocketTimeout(0.00003)
-                            serversocket.send(pickle.dumps(Cell(self.giving_server, ctype=CellType.GET_DIRECT)))
+                            print("got a directory request")
+                            relaysocket.setSocketTimeout(0.00003)
+                            relaysocket.send(pickle.dumps(Cell(self.giving_server, ctype=CellType.GET_DIRECT)))
                             # slow timeout for receive. Else, force close. Basically ensure they have obtained list.
-                            serversocket.recv()
-                            serversocket.close()
+                            relaysocket.recv(4096)
+                            relaysocket.close()
                             continue
                         else:
-                            serversocket.close()
+                            relaysocket.close()
                             # reject connection as it does not contain a valid cell.
                 else:
                     reference = None
                     print("got from existing.")
-                    received = i.recv(4096)
-                    for k in self.registered_relays:
-                        if k.socket == i:
-                            # i.e it is part of the thing.
-                            reference = k
-                    if len(received) == 0:  # disconnect catch
-                        print("CLIENT WAS CLOSED! or timed out.")
-                        i.socket.close()
+                    try:
+                        received = i.recv(4096)
+                    except ConnectionError:
+                        for k in self.registered_relays:
+                            if k.socket == i:
+                                # i.e it is part of the registered relays list
+                                reference = k
+                        print("relay WAS closed! or timed out.")
+                        print("Removed relay with IP: " + str(reference.ip) + " Port: " + str(reference.port))
+                        i.close()
+                        print("closed connection to relay.")
                         self.registered_relays.remove(reference)
+                        self.connected_relays.remove(i)
                         continue
+
+
+a = DirectoryServer()
+while True:
+    a.mainloop()
