@@ -13,29 +13,28 @@ const getters = {};
 
 // actions
 const actions = {
-  getWebsite({ dispatch, commit }, website) {
-    dispatch('status/load', { website }, { root: true });
-    commit('setResponse', null);
-    const result = spawnClient(website);
+  getWebsite({ dispatch, commit, rootState }, website) {
+    if (rootState.status.connected) {
+      dispatch('status/load', { website }, { root: true });
+      const result = spawnClient(website);
 
-    console.log(result);
+      result.stdout.on('data', (data) => {
+        console.log(`stdout: ${data}`);
 
-    result.stdout.on('data', (data) => {
-      console.log(`stdout: ${data}`);
+        commit('addQueryToHistory', website);
+        commit('setResponse', data);
+      });
 
-      commit('addQueryToHistory', website);
-      commit('setResponse', data);
-    });
+      result.stderr.on('data', (data) => {
+        console.log(`stderr: ${data}`);
+        commit('setResponse', null);
+      });
 
-    result.stderr.on('data', (data) => {
-      console.log(`stderr: ${data}`);
-      commit('setResponse', null);
-    });
-
-    result.on('close', (code) => {
-      console.log(`child process exited with code ${code}`);
-      dispatch('status/connected', null, { root: true });
-    });
+      result.on('close', (code) => {
+        console.log(`child process exited with code ${code}`);
+        dispatch('status/connected', null, { root: true });
+      });
+    }
   },
 };
 

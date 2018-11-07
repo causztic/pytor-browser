@@ -1,10 +1,13 @@
 // eslint-disable-next-line import/no-unresolved
-import { spawnServers } from 'common/util';
+import { seconds } from 'common/util';
 
 const state = {
   message: 'You are not connected to the network.',
   connected: false,
   connectionState: 'not_connected',
+  serverNodes: [],
+  directoryQueryDelay: 1000,
+  directoryQueryDelayCounter: 1000,
 };
 
 const actions = {
@@ -14,36 +17,25 @@ const actions = {
   connected({ commit }) {
     commit('connected');
   },
-  startServers({ commit, state }) {
-    if (!state.connected) {
-      const instances = spawnServers();
-      commit('connecting');
-      return new Promise((resolve, _) => {
-        // TODO: check for server timeouts
-        // TODO: update to check for exact server startup
-        instances.forEach((instance) => {
-          instance.stdout.on('data', (data) => {
-            console.log(`stdin: ${data}`);
-          });
-
-          instance.stderr.on('data', (data) => {
-            console.log(`stderr: ${data}`);
-          });
-
-          instance.on('close', (code) => {
-            console.log(`child process exited with code ${code}`);
-          });
-        });
-
-        setTimeout(() => {
-          commit('connected');
-          resolve();
-        }, 300);
-      });
-    }
-    return new Promise((resolve, _) => {
-      resolve();
-    });
+  decrementDelay({ commit, dispatch }) {
+    // try again after a certain time.
+    setTimeout(() => {
+      commit('decrementDelay');
+      if (state.directoryQueryDelayCounter === 0) {
+        dispatch('startServers');
+      } else {
+        dispatch('decrementDelay');
+      }
+    }, 1000);
+  },
+  startServers({ commit, dispatch }) {
+    // prepare for Directory, use placeholder wait
+    commit('connecting');
+    // simulate a connection to the Directory.
+    setTimeout(() => {
+      commit('connectionFailed');
+      dispatch('decrementDelay');
+    }, 3000);
   },
 };
 
@@ -61,6 +53,18 @@ const mutations = {
     state.message = 'Connected to network.';
     state.connectionState = 'connected';
     state.connected = true;
+  },
+  connectionFailed(state) {
+    state.directoryQueryDelay *= 2;
+    state.directoryQueryDelayCounter = state.directoryQueryDelay;
+    state.message = `Failed to connect to Directory. Retry in ${seconds(state.directoryQueryDelayCounter)}..`;
+    state.connectionState = 'not-connected';
+    state.connected = false;
+  },
+  decrementDelay(state) {
+    state.directoryQueryDelayCounter -= 1000;
+    state.message = `Failed to connect to Directory. Retry in ${seconds(state.directoryQueryDelayCounter)}..`;
+    state.connectionState = 'not-connected';
   },
 };
 
