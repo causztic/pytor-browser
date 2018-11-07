@@ -19,12 +19,14 @@
 <script>
 import { mapState } from 'vuex';
 
+const initialHTML = require('../503.html');
+
 export default {
   name: 'BrowserComponent',
   props: ['url', 'fired'],
   data() {
     return {
-      initialHTML: require('../503.html'),
+      initialHTML,
     };
   },
   computed: mapState({
