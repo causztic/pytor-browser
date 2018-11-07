@@ -9,11 +9,12 @@
     right: 0;
     bottom: 0;
     display: flex;
-    width: 150px;
+    min-width: 150px;
     align-items: center;
-    justify-content: space-around;
+    justify-content: flex-end;
   }
   #status {
+    margin-left: 5px;
     width: 10px;
     height: 10px;
     display: inline-block;

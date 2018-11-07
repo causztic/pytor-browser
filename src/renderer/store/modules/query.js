@@ -14,7 +14,7 @@ const getters = {};
 // actions
 const actions = {
   getWebsite({ dispatch, commit }, website) {
-    dispatch('status/load', null, { root: true });
+    dispatch('status/load', { website }, { root: true });
     commit('setResponse', null);
     const result = spawnClient(website);
 

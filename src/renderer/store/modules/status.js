@@ -8,8 +8,8 @@ const state = {
 };
 
 const actions = {
-  load({ commit }) {
-    commit('loading');
+  load({ commit }, { website }) {
+    commit('loading', website);
   },
   connected({ commit }) {
     commit('connected');
@@ -53,8 +53,8 @@ const mutations = {
     state.connectionState = 'connecting';
     state.connected = false;
   },
-  loading(state) {
-    state.message = 'Loading page..';
+  loading(state, website) {
+    state.message = `Loading ${website}..`;
     state.connectionState = 'connecting';
   },
   connected(state) {
