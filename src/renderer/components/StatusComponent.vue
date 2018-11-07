@@ -56,7 +56,7 @@
 import { mapState } from 'vuex';
 
 export default {
-  name: 'LoadingComponent',
+  name: 'StatusComponent',
   computed: mapState({
     connectionState: state => state.status.connectionState,
     message: state => state.status.message,
