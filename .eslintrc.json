@@ -1,5 +1,5 @@
 {
-  "extends": "airbnb-base",
+  "extends": ["airbnb-base", "plugin:vue/essential"],
   "rules": {
     "no-console": "off",
     "no-unused-vars": ["error", { "argsIgnorePattern": "^_" }],

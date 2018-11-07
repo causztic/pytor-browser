@@ -26,30 +26,30 @@
 </template>
 
 <script>
-  export default {
-    name: 'settings-component',
-    data() {
-      return {
-        showMenu: false,
-        nodeCount: 0,
-        activeClass: 'action-button',
-      };
+export default {
+  name: 'settings-component',
+  data() {
+    return {
+      showMenu: false,
+      nodeCount: 0,
+      activeClass: 'action-button',
+    };
+  },
+  methods: {
+    toggleMenu() {
+      this.showMenu = !this.showMenu;
+      if (this.showMenu) {
+        this.activeClass = 'action-button active';
+      } else {
+        this.activeClass = 'action-button';
+      }
     },
-    methods: {
-      toggleMenu() {
-        this.showMenu = !this.showMenu;
-        if (this.showMenu) {
-          this.activeClass = 'action-button active';
-        } else {
-          this.activeClass = 'action-button';
-        }
-      },
-      hideMenuIfVisible() {
-        if (this.showMenu) {
-          this.activeClass = 'action-button';
-          this.showMenu = false;
-        }
-      },
-    }
-  };
+    hideMenuIfVisible() {
+      if (this.showMenu) {
+        this.activeClass = 'action-button';
+        this.showMenu = false;
+      }
+    },
+  },
+};
 </script>
