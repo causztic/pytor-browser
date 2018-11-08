@@ -343,48 +343,33 @@ class Client:
                 return Client.failure()  # return failure
 
             if their_cell.type == CellType.CONTINUE:
-                return Client._req_continue(
-                    their_cell, sock, intermediate_relays)
-
-            response = pickle.loads(their_cell.payload)
-            if isinstance(response, requests.models.Response):
                 if util.CLIENT_DEBUG:
-                    print(response.content, file=sys.stderr)
-                    print(response.status_code, file=sys.stderr)
-                return_dict = {
-                    "content": response.content.decode(response.encoding),
-                    "status code": response.status_code
-                }
-                print(json.dumps(return_dict))
-                return response
-            # Reaching this branch implies data corruption of some form
-            return Client.failure()  # return failure
+                    print("Information is being Streamed. ", file=sys.stderr)
+                summation = their_cell.payload
+                while their_cell.type == CellType.CONTINUE:
+                    recv_cell = sock.recv(8192)  # await answer
+                    # you now receive a cell with encrypted payload.
+                    their_cell = pickle.loads(recv_cell)
+                    if util.CLIENT_DEBUG:
+                        print("received PART", file=sys.stderr)
+                        print(len(recv_cell), file=sys.stderr)
+                        print(recv_cell, file=sys.stderr)
+                        print("received cell payload", file=sys.stderr)
+                        print(their_cell.payload, file=sys.stderr)
+                    their_cell = Client.chain_decryptor(
+                        intermediate_relays, their_cell)
+                    summation += their_cell.payload
+                resp = bytes(summation)  # take the sum of all your bytes
+                resp = pickle.loads(resp)  # load the FINAL item.
+                return Client._check_response(resp)
+
+            resp = pickle.loads(their_cell.payload)
+            return Client._check_response(resp)
         except struct.error:
             print("socketerror", file=sys.stderr)
 
     @staticmethod
-    def _req_continue(their_cell, sock, intermediate_relays):
-        if util.CLIENT_DEBUG:
-            print("Information is being Streamed. ", file=sys.stderr)
-        summation = their_cell.payload
-        while their_cell.type == CellType.CONTINUE:
-            their_cell = sock.recv(8192)  # await answer
-            # you now receive a cell with encrypted payload.
-            if util.CLIENT_DEBUG:
-                print("received PART", file=sys.stderr)
-                print(len(their_cell), file=sys.stderr)
-                print(their_cell, file=sys.stderr)
-
-            their_cell = pickle.loads(their_cell)
-            if util.CLIENT_DEBUG:
-                print("received cell payload", file=sys.stderr)
-                print(their_cell.payload, file=sys.stderr)
-            their_cell = Client.chain_decryptor(
-                intermediate_relays, their_cell)
-            summation += their_cell.payload
-
-        response = bytes(summation)  # take the sum of all your bytes
-        response = pickle.loads(response)  # load the FINAL item.
+    def _check_response(response):
         if isinstance(response, requests.models.Response):
             # check if it's a response type item.
             # This check is unnecessary based off code though...
@@ -399,7 +384,7 @@ class Client:
             print(json.dumps(return_dict))
             return response
         # Reaching this branch implies data corruption of some form
-        return Client.failure()  # return failure
+        return Client.failure()
 
     def close(self):  # to close things.
         """Run at the end of a client call to CLOSE all sockets"""
