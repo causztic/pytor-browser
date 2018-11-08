@@ -24,7 +24,9 @@ from cell import Cell, CellType
 
 class Relay:
     """relay data class"""
-    def __init__(self, given_ip, provided_socket, derived_key, ec_privkey, given_rsa_key, given_port):
+    def __init__(self, given_ip, provided_socket, derived_key, ec_privkey,
+                 given_rsa_key, given_port):
+
         self.ip_addr = given_ip
         self.sock = provided_socket
         self.key = derived_key
@@ -33,12 +35,11 @@ class Relay:
         self.port = given_port
 
 
-
 class Client:
     """Client class"""
 
     def __init__(self):
-        self.relay_LIST = []
+        self.relay_list = []
         # generate RSA public private key pair
         self.private_key = rsa.generate_private_key(
             backend=default_backend(), public_exponent=65537, key_size=3072)
@@ -51,8 +52,9 @@ class Client:
 
     @staticmethod
     def getdirectoryitems():
+        """Method to obtain items from directory"""
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.connect((socket.gethostbyname(socket.gethostname()), 50000))  # essentially connect to directory
+        sock.connect((socket.gethostbyname(socket.gethostname()), 50000))  # connect to directory
         sock.send(pickle.dumps(Cell("", ctype=CellType.GET_DIRECT)))
         received_cell = sock.recv(32768)
         received_cell = pickle.loads(received_cell)
@@ -77,8 +79,8 @@ class Client:
             print(readied_cell)
         encrypted_cell = rsa_public_key.encrypt(
             readied_cell,
-            cryptography.hazmat.primitives.asymmetric.padding.OAEP(
-                mgf=cryptography.hazmat.primitives.asymmetric.padding.MGF1(  # encrypt the readied cell.
+            cryptography.hazmat.primitives.asymmetric.padding.OAEP(  # encrypt the readied cell.
+                mgf=cryptography.hazmat.primitives.asymmetric.padding.MGF1(
                     algorithm=hashes.SHA256()),
                 algorithm=hashes.SHA256(),
                 label=None
@@ -134,8 +136,7 @@ class Client:
 
     @staticmethod
     def aes_encryptor(secret_key, prepared_cell):
-        # a method to encrypt with AES.
-        # returns the initial vector and the encrypted cell.
+        """a method to encrypt with AES. returns the initial vector and the encrypted cell."""
         init_vector = os.urandom(16)
         cipher = Cipher(
             algorithms.AES(secret_key),
@@ -169,7 +170,7 @@ class Client:
                 if CLIENT_DEBUG:
                     print("connected successfully to relay @ " + gonnect
                           + "   Port: " + str(gonnectport))
-                self.relay_LIST.append(
+                self.relay_list.append(
                     Relay(gonnect, sock, derived_key, ec_privkey, rsa_key, gonnectport))
                 return
 
@@ -220,7 +221,7 @@ class Client:
 
             derived_key = self.check_signature_and_derive(their_cell, rsa_key, ec_privkey)
 
-            self.relay_LIST.append(
+            self.relay_list.append(
                 Relay(gonnect, sock, derived_key, ec_privkey, rsa_key, gonnectport))
 
             if CLIENT_DEBUG:
@@ -230,7 +231,7 @@ class Client:
         except (ConnectionResetError, ConnectionRefusedError, struct.error):
             if CLIENT_DEBUG:
                 print("Socket Error, removing from the list.")
-            del self.relay_LIST[0]  # remove it from the lsit
+            del self.relay_list[0]  # remove it from the lsit
             if CLIENT_DEBUG:
                 print("REMOVED relay 0 DUE TO FAILED CONNECTION")
 
@@ -293,7 +294,7 @@ class Client:
             their_cell = pickle.loads(their_cell.payload)
             derived_key = self.check_signature_and_derive(their_cell, rsa_key, ec_privkey)
 
-            self.relay_LIST.append(
+            self.relay_list.append(
                 Relay(gonnect, sock, derived_key, ec_privkey, rsa_key, gonnectport))
 
             if CLIENT_DEBUG:
@@ -354,7 +355,8 @@ class Client:
             if their_cell.type == CellType.FAILED:
                 if CLIENT_DEBUG:
                     print("FAILED AT CONNECTION!")
-                return
+                    print(json.dumps({"content": "", "status": 404}))
+                    return None
 
             elif their_cell.type == CellType.CONTINUE:
                 if CLIENT_DEBUG:
@@ -398,7 +400,7 @@ class Client:
                     return response
 
                 else:
-                    # TODO - Reaching this branch implies data corruption of some form
+                    # Reaching this branch implies data corruption of some form
                     print(json.dumps({"content": "", "status": 404}))
 
             else:
@@ -412,7 +414,7 @@ class Client:
                     print(json.dumps(return_dict))
                     return response
                 else:
-                    # TODO - Reaching this branch implies data corruption of some form
+                    # Reaching this branch implies data corruption of some form
                     print(json.dumps({"content": "", "status": 404}))
 
         except struct.error:
@@ -420,7 +422,7 @@ class Client:
 
     def close(self):  # to close things.
         """Run at the end of a client call to CLOSE all sockets"""
-        for i in self.relay_LIST:
+        for i in self.relay_list:
             i.sock.close()
 
 
@@ -434,13 +436,13 @@ class Responder(BaseHTTPRequestHandler):
         my_client.first_connect(relay_list[0].ip, relay_list[0].port, public_key1)
         public_key2 = serialization.load_pem_public_key(
             relay_list[1].key, backend=default_backend())
-        my_client.more_connect_1(relay_list[1].ip, relay_list[1].port, my_client.relay_LIST,
+        my_client.more_connect_1(relay_list[1].ip, relay_list[1].port, my_client.relay_list,
                                  public_key2)
         public_key3 = serialization.load_pem_public_key(
             relay_list[2].key, backend=default_backend())
-        my_client.more_connect_2(relay_list[2].ip, relay_list[2].port, my_client.relay_LIST,
+        my_client.more_connect_2(relay_list[2].ip, relay_list[2].port, my_client.relay_list,
                                  public_key3)
-        obtained_response = my_client.req(self.path[2:], my_client.relay_LIST)
+        obtained_response = my_client.req(self.path[2:], my_client.relay_list)
 
         self.send_response(obtained_response.status_code)
         self.send_header('Content-type', 'text/html')

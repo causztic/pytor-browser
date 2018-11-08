@@ -326,11 +326,10 @@ class Relay():
                 )))
             )
 
-            client_reference.sock.send(pickle.dumps(
-                Cell(encrypted,
-                     IV=init_vector,
-                     ctype=CellType.ADD_CON))
-            )
+            client_reference.sock.send(
+                pickle.dumps(
+                    Cell(encrypted, IV=init_vector, ctype=CellType.ADD_CON)
+                ))
             print("INVALID REQUEST REPLIED")
 
     @staticmethod
@@ -470,7 +469,7 @@ class Relay():
                     self.relay(sending_client, decrypted, cell_to_next)
 
                 elif cell_to_next.type == CellType.REQ:
-                    self.request_processing(cell_to_next,sending_client)
+                    self.request_processing(cell_to_next, sending_client)
 
 
 def main():
