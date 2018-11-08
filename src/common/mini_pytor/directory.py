@@ -1,6 +1,5 @@
 """Directory Server Class file"""
 import socket
-import time
 import select
 import pickle
 from cryptography.hazmat.primitives import serialization
@@ -9,7 +8,6 @@ import cryptography.hazmat.primitives.asymmetric.padding
 from cryptography.hazmat.primitives import hashes
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric import rsa
-from cryptography.hazmat.primitives import serialization
 from util import RegisteredRelay
 from cell import Cell, CellType
 
@@ -17,7 +15,7 @@ from cell import Cell, CellType
 class Relay:
     """Relay data class"""
     def __init__(self, ip_addr, provided_socket, portnum, given_key):
-        self.ip = ip_addr
+        self.ip_addr = ip_addr
         self.socket = provided_socket
         self.port = portnum
         self.key = given_key
@@ -47,6 +45,7 @@ class DirectoryServer:
         self.socket.listen(100)
 
     def handleconnection(self):
+        """Handle an incoming connection to the server."""
         print("got a connection request.")
         relaysocket, _ = self.socket.accept()
         # obtain the data sent over.
@@ -86,20 +85,19 @@ class DirectoryServer:
             ipaddress, _ = relaysocket.getpeername()  # obtain the ip and port of that server.
             print("Added-> PORT: " + str(portnum) + " IP: " + str(ipaddress))
             self.connected_relays.append(
-                Relay(ipaddress, relaysocket,
-                      portnum, theirpublickey))
+                Relay(ipaddress, relaysocket,portnum, theirpublickey))
 
-            self.registered_relays.append(RegisteredRelay(ipaddress, portnum, publickey_bytes))
+            self.registered_relays.append(
+                RegisteredRelay(ipaddress, portnum, publickey_bytes))
+
             self.relay_sockets.append(relaysocket)
             return
 
         elif receivedcell.type == CellType.GET_DIRECT:
             print("got a directory request")
-            relaysocket.settimeout(0.03)
+            relaysocket.settimeout(0.03)  # ensure we don't block forever
             relaysocket.send(pickle.dumps(
-                Cell(self.registered_relays, ctype=CellType.GET_DIRECT)
-            ))
-            # slow timeout for receive. Else, force close. Basically ensure they have obtained list.
+                Cell(self.registered_relays, ctype=CellType.GET_DIRECT)))
             relaysocket.recv(4096)
             relaysocket.close()
             return
@@ -120,11 +118,11 @@ class DirectoryServer:
                     reference = k
 
             for k in self.registered_relays:
-                if k.ip == reference.ip and k.port == reference.port:
+                if k.ip == reference.ip_addr and k.port == reference.port:
                     reference2 = k
 
             print("relay WAS closed! or timed out.")
-            print("Removed relay with IP: " + str(reference.ip)
+            print("Removed relay with IP: " + str(reference.ip_addr)
                   + " Port: " + str(reference.port))
 
             provided_socket.close()
@@ -145,5 +143,5 @@ class DirectoryServer:
                     self.handleclosed(i)
 
 
-Directory = DirectoryServer()
-Directory.mainloop()
+directory = DirectoryServer()
+directory.mainloop()

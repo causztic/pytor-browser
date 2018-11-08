@@ -24,7 +24,7 @@ from cell import Cell, CellType
 
 class Relay:
     """relay data class"""
-    def __init__(self,given_ip, provided_socket, derived_key, ec_privkey, given_rsa_key, given_port):
+    def __init__(self, given_ip, provided_socket, derived_key, ec_privkey, given_rsa_key, given_port):
         self.ip_addr = given_ip
         self.sock = provided_socket
         self.key = derived_key
@@ -242,13 +242,15 @@ class Client:
             print("Innermost cell with keys (Encrypted)")
             print(encrypted_cell)
         # connection type. exit node always knows
-        sending_cell = Cell(encrypted_cell, ctype=CellType.RELAY_CONNECT)  # Deepest layer, encrypted with RSA
+        sending_cell = Cell(encrypted_cell, ctype=CellType.RELAY_CONNECT)
+        # Deepest layer, encrypted with RSA
         sending_cell.ip_addr = gonnect
         sending_cell.port = gonnectport
         # inform of next port of call.
         init_vector, encrypted_cell = Client.aes_encryptor(intermediate_relays[1].key, sending_cell)
         # encrypt using said keys.
-        sending_cell = Cell(encrypted_cell, IV=init_vector, ctype=CellType.RELAY_CONNECT)  # 2nd Layer from top
+        sending_cell = Cell(encrypted_cell, IV=init_vector, ctype=CellType.RELAY_CONNECT)
+        # 2nd Layer from top
 
         sending_cell.ip_addr = intermediate_relays[1].ip_addr
         sending_cell.port = intermediate_relays[1].port
@@ -372,7 +374,8 @@ class Client:
                     counter = 0
 
                     while counter < len(intermediate_relays):
-                        decrypted = Client.aes_decryptor(intermediate_relays[counter].key, their_cell)
+                        decrypted = Client.aes_decryptor(intermediate_relays[counter].key,
+                                                         their_cell)
                         their_cell = pickle.loads(decrypted)
                         counter += 1
                         if counter < len(intermediate_relays):
@@ -382,7 +385,8 @@ class Client:
 
                 response = bytes(summation)  # take the sum of all your bytes
                 response = pickle.loads(response)  # load the FINAL item.
-                if isinstance(response, requests.models.Response):  # check if it's a response type item.
+                if isinstance(response, requests.models.Response):
+                    # check if it's a response type item.
                     # This check is unnecessary based off code though... Left in in case of attack
                     if CLIENT_DEBUG:
                         print(response.content)
@@ -430,10 +434,12 @@ class Responder(BaseHTTPRequestHandler):
         my_client.first_connect(relay_list[0].ip, relay_list[0].port, public_key1)
         public_key2 = serialization.load_pem_public_key(
             relay_list[1].key, backend=default_backend())
-        my_client.more_connect_1(relay_list[1].ip, relay_list[1].port, my_client.relay_LIST, public_key2)
+        my_client.more_connect_1(relay_list[1].ip, relay_list[1].port, my_client.relay_LIST,
+                                 public_key2)
         public_key3 = serialization.load_pem_public_key(
             relay_list[2].key, backend=default_backend())
-        my_client.more_connect_2(relay_list[2].ip, relay_list[2].port, my_client.relay_LIST, public_key3)
+        my_client.more_connect_2(relay_list[2].ip, relay_list[2].port, my_client.relay_LIST,
+                                 public_key3)
         obtained_response = my_client.req(self.path[2:], my_client.relay_LIST)
 
         self.send_response(obtained_response.status_code)
