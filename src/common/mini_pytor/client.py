@@ -109,7 +109,7 @@ class Client:
             encrypted_cell, ec_privkey = Client.make_first_connect_cell(
                 rsa_key)
             if util.CLIENT_DEBUG:
-                print("first connect Actual cell(decrypted bytes)")
+                print("First connect actual cell (decrypted bytes)")
                 print(encrypted_cell)
             sock.send(encrypted_cell)  # Send them my generated ecdhe key.
             their_cell = sock.recv(4096)  # await a response.
@@ -171,7 +171,7 @@ class Client:
 
             if their_cell.type == CellType.FAILED:
                 if util.CLIENT_DEBUG:
-                    print("FAILED AT CONNECTION!")
+                    print("FAILED AT CONNECTION!", file=sys.stderr)
                 if their_cell.payload == "CONNECTIONREFUSED":
                     print("Connection was refused. Is the relay online yet?")
                 return
@@ -184,7 +184,7 @@ class Client:
 
             if util.CLIENT_DEBUG:
                 print("connected successfully to relay @ " + gonnect
-                      + "   Port: " + str(gonnectport))
+                      + "   Port: " + str(gonnectport), file=sys.stderr)
 
         except (ConnectionResetError, ConnectionRefusedError, struct.error):
             if util.CLIENT_DEBUG:
@@ -198,7 +198,7 @@ class Client:
 
         encrypted_cell, ec_privkey = Client.make_first_connect_cell(rsa_key)
         if util.CLIENT_DEBUG:
-            print("Innermost cell with keys (Encrypted)")
+            print("Innermost cell with keys (encrypted)", file=sys.stderr)
             print(encrypted_cell)
         # connection type. exit node always knows
         sending_cell = Cell(encrypted_cell, ctype=CellType.RELAY_CONNECT)
@@ -255,7 +255,7 @@ class Client:
 
             if their_cell.type == CellType.FAILED:
                 if util.CLIENT_DEBUG:
-                    print("FAILED AT CONNECTION!")
+                    print("FAILED AT CONNECTION!", file=sys.stderr)
                 return
 
             their_cell = pickle.loads(their_cell.payload)
@@ -267,7 +267,7 @@ class Client:
 
             if util.CLIENT_DEBUG:
                 print("connected successfully to relay @ " + gonnect
-                      + "   Port: " + str(gonnectport))
+                      + "   Port: " + str(gonnectport), file=sys.stderr)
         except struct.error:
             print("socket error occurred", file=sys.stderr)
 
@@ -344,49 +344,21 @@ class Client:
 
             if their_cell.type == CellType.FAILED:
                 if util.CLIENT_DEBUG:
-                    print("FAILED AT CONNECTION!")
+                    print("FAILED AT CONNECTION!", file=sys.stderr)
                     return Client.failure()  # return failure
             elif their_cell.type == CellType.CONTINUE:
-                if util.CLIENT_DEBUG:
-                    print("Information is being Streamed. ")
-                summation = their_cell.payload
-                while their_cell.type == CellType.CONTINUE:
-                    their_cell = sock.recv(8192)  # await answer
-                    # you now receive a cell with encrypted payload.
-                    if util.CLIENT_DEBUG:
-                        print("received PART")
-                        print(len(their_cell))
-                        print(their_cell)
-                    their_cell = pickle.loads(their_cell)
-                    if util.CLIENT_DEBUG:
-                        print("received cell payload")
-                        print(their_cell.payload)
-                    their_cell = Client.chain_decryptor(
-                        intermediate_relays, their_cell)
-                    summation += their_cell.payload
-                response = bytes(summation)  # take the sum of all your bytes
-                response = pickle.loads(response)  # load the FINAL item.
-                if isinstance(response, requests.models.Response):
-                    # check if it's a response type item.
-                    # This check is unnecessary based off code though...
-                    # Left in in case of attack
-                    if util.CLIENT_DEBUG:
-                        print(response.content)
-                        print(response.status_code)
-                    return_dict = {"content": response.content.decode(
-                        response.encoding), "status code": response.status_code}
-                    print(json.dumps(return_dict))
-                    return response
-                # Reaching this branch implies data corruption of some form
-                return Client.failure()  # return failure
+                return Client._req_continue(
+                    their_cell, sock, intermediate_relays)
             else:
                 response = pickle.loads(their_cell.payload)
                 if isinstance(response, requests.models.Response):
                     if util.CLIENT_DEBUG:
-                        print(response.content)
-                        print(response.status_code)
-                    return_dict = {"content": response.content.decode(
-                        response.encoding), "status code": response.status_code}
+                        print(response.content, file=sys.stderr)
+                        print(response.status_code, file=sys.stderr)
+                    return_dict = {
+                        "content": response.content.decode(response.encoding),
+                        "status code": response.status_code
+                    }
                     print(json.dumps(return_dict))
                     return response
                 # Reaching this branch implies data corruption of some form
@@ -394,6 +366,45 @@ class Client:
 
         except struct.error:
             print("socketerror", file=sys.stderr)
+
+    @staticmethod
+    def _req_continue(their_cell, sock, intermediate_relays):
+        if util.CLIENT_DEBUG:
+            print("Information is being Streamed. ", file=sys.stderr)
+        summation = their_cell.payload
+        while their_cell.type == CellType.CONTINUE:
+            their_cell = sock.recv(8192)  # await answer
+            # you now receive a cell with encrypted payload.
+            if util.CLIENT_DEBUG:
+                print("received PART", file=sys.stderr)
+                print(len(their_cell), file=sys.stderr)
+                print(their_cell, file=sys.stderr)
+
+            their_cell = pickle.loads(their_cell)
+            if util.CLIENT_DEBUG:
+                print("received cell payload", file=sys.stderr)
+                print(their_cell.payload, file=sys.stderr)
+            their_cell = Client.chain_decryptor(
+                intermediate_relays, their_cell)
+            summation += their_cell.payload
+
+        response = bytes(summation)  # take the sum of all your bytes
+        response = pickle.loads(response)  # load the FINAL item.
+        if isinstance(response, requests.models.Response):
+            # check if it's a response type item.
+            # This check is unnecessary based off code though...
+            # Left in in case of attack
+            if util.CLIENT_DEBUG:
+                print(response.content, file=sys.stderr)
+                print(response.status_code, file=sys.stderr)
+            return_dict = {
+                "content": response.content.decode(response.encoding),
+                "status code": response.status_code
+            }
+            print(json.dumps(return_dict))
+            return response
+        # Reaching this branch implies data corruption of some form
+        return Client.failure()  # return failure
 
     def close(self):  # to close things.
         """Run at the end of a client call to CLOSE all sockets"""
@@ -433,12 +444,12 @@ class Responder(BaseHTTPRequestHandler):
 
         obtained_response = my_client.req(self.path[2:], my_client.relay_list)
         if isinstance(obtained_response, str):
-            print("producing invalid reply")
+            print("Producing invalid reply")
             self.send_response(404)
-            answer = str.encode(obtained_response)
+            answer = obtained_response.encode()
             my_client.close()
         else:
-            print("producing valid reply")
+            print("Producing valid reply")
             self.send_response(obtained_response.status_code)
             my_client.close()
             answer = bytes(obtained_response.content)
