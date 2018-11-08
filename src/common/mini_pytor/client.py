@@ -366,8 +366,7 @@ class Client:
             if their_cell.type == CellType.FAILED:
                 if CLIENT_DEBUG:
                     print("FAILED AT CONNECTION!")
-                    print("some form of data corruption occurred.")
-                    return json.dumps({"content": "", "status": 404})
+                    return Client.failure()  # return failure
 
             elif their_cell.type == CellType.CONTINUE:
                 if CLIENT_DEBUG:
@@ -384,7 +383,6 @@ class Client:
                     if CLIENT_DEBUG:
                         print("received cell payload")
                         print(their_cell.payload)
-
                     their_cell = Client.chain_decryptor(intermediate_relays, their_cell)
                     summation += their_cell.payload
 
@@ -399,13 +397,11 @@ class Client:
                     return_dict = {"content": response.content.decode(
                         response.encoding), "status code": response.status_code}
                     print(json.dumps(return_dict))
-                    # print(response.json())
                     return response
 
                 else:
                     # Reaching this branch implies data corruption of some form
-                    print("some form of data corruption occurred.")
-                    return json.dumps({"content": "", "status": 404})
+                    return Client.failure()  # return failure
 
             else:
                 response = pickle.loads(their_cell.payload)
@@ -419,8 +415,7 @@ class Client:
                     return response
                 else:
                     # Reaching this branch implies data corruption of some form
-                    print("some form of data corruption occurred.")
-                    return json.dumps({"content": "", "status": 404})
+                    return Client.failure()  # return failure
 
         except struct.error:
             print("socketerror")
@@ -429,6 +424,12 @@ class Client:
         """Run at the end of a client call to CLOSE all sockets"""
         for i in self.relay_list:
             i.sock.close()
+
+    @staticmethod
+    def failure():
+        """Default Error message."""
+        print("some form of data corruption occurred, or no reply was obtained.")
+        return json.dumps({"content": "", "status": 404})
 
 
 class Responder(BaseHTTPRequestHandler):
@@ -449,18 +450,20 @@ class Responder(BaseHTTPRequestHandler):
         my_client.more_connect_2(relay_list[2].ip, relay_list[2].port, my_client.relay_list,
                                  public_key3)
         obtained_response = my_client.req(self.path[2:], my_client.relay_list)
+
         if isinstance(obtained_response, str):
-            self.send_response(404)  # TODO something.
-            self.send_header('Content-type', 'text/html')
-            self.end_headers()
-            self.wfile.write(str.encode(obtained_response))
+            print("producing invalid reply")
+            self.send_response(404)
+            answer = str.encode(obtained_response)
             my_client.close()
-            return
-        self.send_response(obtained_response.status_code)
+        else:
+            print("producing valid reply")
+            self.send_response(obtained_response.status_code)
+            my_client.close()
+            answer = bytes(obtained_response.content)
         self.send_header('Content-type', 'text/html')
         self.end_headers()
-        self.wfile.write(bytes(obtained_response.content))
-        my_client.close()
+        self.wfile.write(answer)
 
 
 def main():

@@ -313,7 +313,7 @@ class Relay():
                     )))
                 )
                 client_reference.sock.send(pickle.dumps(
-                    Cell(encrypted, IV=init_vector, ctype=CellType.ADD_CON)))
+                    Cell(encrypted, IV=init_vector, ctype=CellType.FINISHED)))
                 print("finished sending valid reply.")
 
         else:
