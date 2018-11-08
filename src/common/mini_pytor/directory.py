@@ -73,8 +73,8 @@ class DirectoryServer:
             try:
                 theirpublickey.verify(signature, base_bytearray,
                                       cryptography.hazmat.primitives.asymmetric.padding.PSS(
-                                          mgf=cryptography.hazmat.primitives.asymmetric.padding.MGF1(
-                                              hashes.SHA256()),
+                                          mgf=cryptography.hazmat.primitives.asymmetric.padding.MGF1
+                                          (hashes.SHA256()),
                                           salt_length=cryptography.hazmat.primitives.asymmetric.padding.PSS.MAX_LENGTH),
                                       hashes.SHA256())
             except InvalidSignature:
@@ -85,7 +85,7 @@ class DirectoryServer:
             ipaddress, _ = relaysocket.getpeername()  # obtain the ip and port of that server.
             print("Added-> PORT: " + str(portnum) + " IP: " + str(ipaddress))
             self.connected_relays.append(
-                Relay(ipaddress, relaysocket,portnum, theirpublickey))
+                Relay(ipaddress, relaysocket, portnum, theirpublickey))
 
             self.registered_relays.append(
                 RegisteredRelay(ipaddress, portnum, publickey_bytes))
@@ -143,5 +143,5 @@ class DirectoryServer:
                     self.handleclosed(i)
 
 
-directory = DirectoryServer()
-directory.mainloop()
+DIRECTORY = DirectoryServer()
+DIRECTORY.mainloop()
