@@ -20,26 +20,26 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from util import padder128, CLIENT_DEBUG
 from cell import Cell, CellType
+from dataclasses import dataclass
 
 
+@dataclass()
 class Relay():
-    """relay class"""
-
-    def __init__(self, ip, sock, derived_key, ec_key, rsa_key, port):
-        self.ip_addr = ip
-        self.sock = sock
-        self.key = derived_key
-        self.ec_key = ec_key
-        self.rsa_key = rsa_key
-        self.port = port
+    """relay data class"""
+    ip_addr: str
+    sock:socket.socket
+    key: bytes
+    ec_key: bytes
+    rsa_key: bytes
+    port: int
 
 
+@dataclass
 class RegisteredRelay():
-    """Relay data class, minus socket."""
-    def __init__(self, ipaddr, portnum, publickey):
-        self.ip = ipaddr
-        self.port = portnum
-        self.key = publickey
+    """Directory Relay information data class"""
+    ip: str
+    port: int
+    key = bytes
 
 
 class Client():
@@ -179,8 +179,9 @@ class Client():
                     print("connected successfully to relay @ " + gonnect
                           + "   Port: " + str(gonnectport))
                 self.relay_LIST.append(
-                    Relay(gonnect, sock, derived_key, ec_privkey, rsa_key, gonnectport))
+                    Relay(ip_addr=gonnect, sock=sock, key=derived_key, ec_key=ec_privkey, rsa_key=rsa_key, port=gonnectport))
                 return
+
             else:  # Verification error or Unpacking Error occurred
                 print("verification of signature failed/Invalid cell was received.")
                 return
@@ -229,7 +230,8 @@ class Client():
             derived_key = self.check_signature_and_derive(their_cell, rsa_key, ec_privkey)
 
             self.relay_LIST.append(
-                Relay(gonnect, sock, derived_key, ec_privkey, rsa_key, gonnectport))
+                Relay(ip_addr=gonnect, sock=sock, key=derived_key, ec_key=ec_privkey,
+                      rsa_key=rsa_key, port=gonnectport))
 
             if CLIENT_DEBUG:
                 print("connected successfully to relay @ " + gonnect
@@ -300,7 +302,8 @@ class Client():
             derived_key = self.check_signature_and_derive(their_cell, rsa_key, ec_privkey)
 
             self.relay_LIST.append(
-                Relay(gonnect, sock, derived_key, ec_privkey, rsa_key, gonnectport))
+                Relay(ip_addr=gonnect, sock=sock, key=derived_key, ec_key=ec_privkey,
+                      rsa_key=rsa_key, port=gonnectport))
 
             if CLIENT_DEBUG:
                 print("connected successfully to relay @ " + gonnect

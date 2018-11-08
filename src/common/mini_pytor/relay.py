@@ -190,7 +190,7 @@ class Relay():
         return client_class
 
     @staticmethod
-    def extend_circuit(self, cell_to_next, decrypted, client_reference, socket_to_client):
+    def extend_circuit(cell_to_next, decrypted, client_reference, socket_to_client):
         init_vector = os.urandom(16)
         cipher = Cipher(
             algorithms.AES(client_reference.key),
@@ -299,6 +299,7 @@ class Relay():
                     print("got a packet from an existing client")
                     if not received:
                         raise ConnectionResetError
+
                 except (struct.error, ConnectionResetError,
                         ConnectionAbortedError, socket.timeout):
                     print("Client was closed or timed out.")
@@ -311,14 +312,12 @@ class Relay():
                 gotten_cell = pickle.loads(received)
                 decrypted = self.aes_decryptor(sending_client.key, gotten_cell)
                 cell_to_next = pickle.loads(decrypted)
-
                 if RELAY_DEBUG:
                     print(f"Cell type: {cell_to_next.type}")
 
                 if cell_to_next.type == CellType.RELAY_CONNECT:
                     # is a request for a relay connect
                     self.extend_circuit(cell_to_next, decrypted, sending_client, i)
-
                 elif cell_to_next.type == CellType.RELAY:
                     # is a cell that is to be relayed.
                     if sending_client.bounce_socket is None:  # There is no next hop registered to this client.
