@@ -5,6 +5,7 @@ import sys
 import json
 import struct
 import socket
+import select
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import urllib
@@ -61,7 +62,7 @@ class Client:
         sending_cell = Cell(dh_pubkey_bytes, ctype=CellType.ADD_CON)
         readied_cell = pickle.dumps(sending_cell)
         if util.CLIENT_DEBUG:
-            print("first connect Actual cell (encrypted bytes) ")
+            print("First connect actual cell (encrypted bytes) ")
             print(readied_cell)
         encrypted_cell = rsa_public_key.encrypt(
             readied_cell,
@@ -123,21 +124,21 @@ class Client:
 
             if derived_key:  # ie did not return None.
                 if util.CLIENT_DEBUG:
-                    print("connected successfully to relay @ " + gonnect
+                    print("Connected successfully to relay @ " + gonnect
                           + "   Port: " + str(gonnectport))
                 self.relay_list.append(
                     RelayData(gonnect, sock, derived_key, ec_privkey, rsa_key, gonnectport))
             else:  # Verification error or Unpacking Error occurred
-                print("verification of signature failed/Invalid cell was received.")
+                print("Verification of signature failed/Invalid cell was received.")
         except (struct.error, ConnectionResetError, ConnectionRefusedError):
-            print("disconnected or relay is not online/ connection was "
+            print("Disconnected or relay is not online/ connection was "
                   + "refused.", file=sys.stderr)
 
     def more_connect_1(self, gonnect, gonnectport, rsa_key):
         """Connect to the next relay through the first one."""
         encrypted_cell, ec_privkey = Client.make_first_connect_cell(rsa_key)
         if util.CLIENT_DEBUG:
-            print("Innermost cell with keys (Encrypted)")
+            print("Innermost cell with keys (encrypted)")
             print(encrypted_cell)
 
         intermediate_relays = self.relay_list
@@ -157,7 +158,7 @@ class Client:
             sock = intermediate_relays[0].sock
             sock.send(pickle.dumps(sending_cell))  # send over the cell
             if util.CLIENT_DEBUG:
-                print("cell sent: ")
+                print("Cell sent: ")
                 print(pickle.dumps(sending_cell))
             their_cell = sock.recv(4096)  # await answer
             # you now receive a cell with encrypted payload.
@@ -185,7 +186,7 @@ class Client:
                 RelayData(gonnect, sock, derived_key, ec_privkey, rsa_key, gonnectport))
 
             if util.CLIENT_DEBUG:
-                print("connected successfully to relay @ " + gonnect
+                print("Connected successfully to relay @ " + gonnect
                       + "   Port: " + str(gonnectport), file=sys.stderr)
 
         except (ConnectionResetError, ConnectionRefusedError, struct.error):
@@ -269,10 +270,10 @@ class Client:
                 RelayData(gonnect, sock, derived_key, ec_privkey, rsa_key, gonnectport))
 
             if util.CLIENT_DEBUG:
-                print("connected successfully to relay @ " + gonnect
+                print("Connected successfully to relay @ " + gonnect
                       + "   Port: " + str(gonnectport), file=sys.stderr)
         except struct.error:
-            print("socket error occurred", file=sys.stderr)
+            print("Socket error occurred", file=sys.stderr)
 
     @staticmethod
     def req_wrapper(request, relay_list):
@@ -305,7 +306,7 @@ class Client:
 
     @staticmethod
     def chain_decryptor(list_of_intermediate_relays, provided_cell):
-        """decrypt something given a list the intermediate relay list
+        """Decrypt something given a list the intermediate relay list
         and the cell"""
         counter = 0
         while counter < len(list_of_intermediate_relays):
@@ -349,7 +350,7 @@ class Client:
             if their_cell.type == CellType.CONTINUE:
                 if util.CLIENT_DEBUG:
                     print("Information is being Streamed. ", file=sys.stderr)
-                summation = their_cell.payload
+                summation = [their_cell.payload]
                 while their_cell.type == CellType.CONTINUE:
                     recv_cell = sock.recv(8192)  # await answer
                     # you now receive a cell with encrypted payload.
@@ -362,8 +363,8 @@ class Client:
                         print(their_cell.payload, file=sys.stderr)
                     their_cell = Client.chain_decryptor(
                         intermediate_relays, their_cell)
-                    summation += their_cell.payload
-                resp = bytes(summation)  # take the sum of all your bytes
+                    summation.append(their_cell.payload)
+                resp = bytes(b"".join(summation))  # take the sum of all your bytes
                 resp = pickle.loads(resp)  # load the FINAL item.
                 return Client._check_response(resp)
 

@@ -256,7 +256,7 @@ class Relay():
                                   + "Chrome/70.0.3538.77 Safari/537.36"}
 
                 req = requests.get(request, headers=header)
-                print("length of answer" + str(len(req.content)))
+                print("Length of answer: " + str(len(req.content)))
             except requests.exceptions.ConnectionError:
                 req = "ERROR"
                 print("Failed to receive response from website", file=sys.stderr)
@@ -274,7 +274,7 @@ class Relay():
                     client_reference["sock"].send(pickle.dumps(
                         Cell(encrypted, IV=init_vector, ctype=CellType.ADD_CON)))
                     if util.RELAY_DEBUG:
-                        print("sent one packet")
+                        print("Sent one packet")
                     # remove the bytes from the total bytes that have to be sent
                     del payload_bytes[:4096]
                     # slight delay for buffer issues
@@ -287,7 +287,7 @@ class Relay():
                 )
                 client_reference["sock"].send(pickle.dumps(
                     Cell(encrypted, IV=init_vector, ctype=CellType.FINISHED)))
-                print("finished sending valid replies.")
+                print("Finished sending valid replies.")
             else:
                 encrypted, init_vector = util.aes_encryptor(
                     client_reference["key"],
@@ -295,14 +295,13 @@ class Relay():
                 )
                 client_reference["sock"].send(pickle.dumps(
                     Cell(encrypted, IV=init_vector, ctype=CellType.FINISHED)))
-                print("finished sending valid reply.")
+                print("Finished sending valid reply.")
 
         else:
             encrypted, init_vector = util.aes_encryptor(
                 client_reference["key"],
                 Cell("INVALID REQUEST DUMDUM", ctype=CellType.CONNECT_RESP)
             )
-
             client_reference["sock"].send(
                 pickle.dumps(
                     Cell(encrypted, IV=init_vector, ctype=CellType.ADD_CON)
@@ -331,10 +330,9 @@ class Relay():
                 their_cell = "request timed out!"
             their_cell = pickle.loads(their_cell)
             if util.RELAY_DEBUG:
-                print("relay reply received type")
-                print(their_cell.type)
+                print(f"Relay reply received type: {their_cell.type}")
             if their_cell.type != CellType.FINISHED:
-                print("got answer back.. as a relay.")
+                print("Got answer back.. as a relay.")
                 encrypted, init_vector = util.aes_encryptor(
                     client_reference["key"],
                     Cell(their_cell, ctype=CellType.CONNECT_RESP)
@@ -344,9 +342,9 @@ class Relay():
                     IV=init_vector,
                     ctype=CellType.CONTINUE
                 )))
-                print("relayed a packet.")
+                print("Relayed a packet.")
             else:
-                print("received the last packet.")
+                print("Received the last packet.")
                 encrypted, init_vector = util.aes_encryptor(
                     client_reference["key"],
                     Cell(their_cell, ctype=CellType.FINISHED)
@@ -356,9 +354,8 @@ class Relay():
                     IV=init_vector,
                     ctype=CellType.FINISHED
                 )))
-                print("relayed the last packet for this communication")
+                print("Relayed the last packet for this communication")
                 break
-
         print("Relay success.\n\n\n\n\n")
 
     def run(self):
@@ -392,7 +389,7 @@ class Relay():
                         continue
                 try:
                     received = i.recv(4096)
-                    print("got a packet from an existing client")
+                    print("Got a packet from an existing client")
                     if not received:
                         # received None
                         # shouldn't be possible but just in case.
@@ -409,7 +406,8 @@ class Relay():
                     continue
 
                 gotten_cell = pickle.loads(received)
-                decrypted = util.aes_decryptor(sending_client["key"], gotten_cell)
+                decrypted = util.aes_decryptor(
+                    sending_client["key"], gotten_cell)
                 # decrypt the obtained cell
                 cell_to_next = pickle.loads(decrypted)
 

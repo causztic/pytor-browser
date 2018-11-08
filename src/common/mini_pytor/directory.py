@@ -46,7 +46,7 @@ class DirectoryServer:
         obtained = relay_socket.recv(4096)
         try:
             received_cell = pickle.loads(obtained)
-        except (pickle.PickleError, pickle.PicklingError, pickle.UnpicklingError) as _:
+        except (pickle.PickleError, pickle.PicklingError, pickle.UnpicklingError):
             relay_socket.close()
             return
 
