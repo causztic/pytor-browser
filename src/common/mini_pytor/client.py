@@ -7,6 +7,7 @@ import struct
 import socket
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
+import urllib
 import requests
 from cryptography.hazmat.primitives.asymmetric import padding, rsa, ec
 from cryptography.hazmat.primitives import serialization
@@ -17,6 +18,7 @@ from cryptography.exceptions import InvalidSignature
 
 import util
 from cell import Cell, CellType
+
 
 class Client:
     """Client class"""
@@ -131,13 +133,14 @@ class Client:
             print("disconnected or relay is not online/ connection was "
                   + "refused.", file=sys.stderr)
 
-    def more_connect_1(self, gonnect, gonnectport, intermediate_relays, rsa_key):
+    def more_connect_1(self, gonnect, gonnectport, rsa_key):
         """Connect to the next relay through the first one."""
         encrypted_cell, ec_privkey = Client.make_first_connect_cell(rsa_key)
         if util.CLIENT_DEBUG:
             print("Innermost cell with keys (Encrypted)")
             print(encrypted_cell)
 
+        intermediate_relays = self.relay_list
         sending_cell = Cell(encrypted_cell, ctype=CellType.RELAY_CONNECT)
         sending_cell.ip_addr = gonnect
         sending_cell.port = gonnectport
@@ -192,13 +195,14 @@ class Client:
             if util.CLIENT_DEBUG:
                 print("REMOVED relay 0 DUE TO FAILED CONNECTION")
 
-    def more_connect_2(self, gonnect, gonnectport, intermediate_relays, rsa_key):
+    def more_connect_2(self, gonnect, gonnectport, rsa_key):
         """Connect to the next relay through my 2 connected relays."""
-
         encrypted_cell, ec_privkey = Client.make_first_connect_cell(rsa_key)
         if util.CLIENT_DEBUG:
             print("Innermost cell with keys (encrypted)", file=sys.stderr)
             print(encrypted_cell)
+
+        intermediate_relays = self.relay_list
         # connection type. exit node always knows
         sending_cell = Cell(encrypted_cell, ctype=CellType.RELAY_CONNECT)
         # Deepest layer, encrypted with RSA
@@ -316,14 +320,14 @@ class Client:
 
         return provided_cell
 
-    @staticmethod
-    def req(request, intermediate_relays):
+    def req(self, request):
         """send out stuff in router."""
         if util.CLIENT_DEBUG:
             print("REQUEST SENDING TEST")
         # must send IV and a cell that is encrypted with the next public key
         # public key list will have to be accessed in order with list of relays
         # connection type. exit node always knows
+        intermediate_relays = self.relay_list
         sending_cell = Client.req_wrapper(request, intermediate_relays)
         try:
             sock = intermediate_relays[0].sock
@@ -406,23 +410,27 @@ class Responder(BaseHTTPRequestHandler):
         """Get request response method"""
         my_client = Client()
         # Get references from directories.
-        relay_list = my_client.get_directory_items()
-        pubkey_1 = serialization.load_pem_public_key(
-            relay_list[0].key, backend=default_backend())
-        my_client.first_connect(
-            relay_list[0].ip, relay_list[0].port, pubkey_1)
+        relay_list = Client.get_directory_items()
+        NUM_RELAYS = 3
+        options = {
+            0: my_client.first_connect,
+            1: my_client.more_connect_1,
+            2: my_client.more_connect_2
+        }
 
-        pubkey_2 = serialization.load_pem_public_key(
-            relay_list[1].key, backend=default_backend())
-        my_client.more_connect_1(relay_list[1].ip, relay_list[1].port,
-                                 my_client.relay_list, pubkey_2)
+        for i in range(NUM_RELAYS):
+            relay = relay_list[i]
+            pubkey = serialization.load_pem_public_key(
+                relay["key"], backend=default_backend())
+            connect_func = options[i]
+            connect_func(relay["ip_addr"], relay["port"], pubkey)
+            print(my_client.relay_list)
 
-        pubkey_3 = serialization.load_pem_public_key(
-            relay_list[2].key, backend=default_backend())
-        my_client.more_connect_2(relay_list[2].ip, relay_list[2].port,
-                                 my_client.relay_list, pubkey_3)
-
-        obtained_response = my_client.req(self.path[2:], my_client.relay_list)
+        if self.path == "/favicon.ico":
+            return
+        path = Responder._handle_url(self.path)
+        print(path)
+        obtained_response = my_client.req(path)
         if isinstance(obtained_response, str):
             print("Producing invalid reply")
             self.send_response(404)
@@ -437,6 +445,21 @@ class Responder(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(answer)
 
+    @staticmethod
+    def _handle_url(url_path):
+        fallback = "http://www.motherfuckingwebsite.com"
+        query = urllib.parse.parse_qs(url_path[2:])
+        if not query:
+            index1 = url_path.find("http://")
+            index2 = url_path.find("https://")
+            if index1 != -1:
+                return url_path[index1:]
+            if index2 != -1:
+                return url_path[index2:]
+            return fallback
+        if "req" in query:
+            return query["req"][0]
+        return fallback
 
 class RelayData:
     """Relay data class"""

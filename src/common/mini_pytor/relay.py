@@ -161,7 +161,10 @@ class Relay():
         client_obj = {
             "sock": client_sock,
             "key": derived_key,
-            "generated_key": generated_privkey
+            "generated_key": generated_privkey,
+            "bounce_ip": None,
+            "bounce_port": None,
+            "bounce_socket": None
         }
         client_name = client_obj["sock"].getpeername()
         self.CLIENTS.append(client_obj)
@@ -229,7 +232,7 @@ class Relay():
             inner_cell_pickle = pickle.dumps(
                 Cell("CONNECTIONREFUSED", ctype=CellType.FAILED))
             encrypted, init_vector = util.aes_encryptor(
-                client_reference.key,
+                client_reference["key"],
                 Cell(inner_cell_pickle, ctype=CellType.FAILED)
             )
             socket_to_client.send(pickle.dumps(Cell(
@@ -300,7 +303,7 @@ class Relay():
                 Cell("INVALID REQUEST DUMDUM", ctype=CellType.CONNECT_RESP)
             )
 
-            client_reference.sock.send(
+            client_reference["sock"].send(
                 pickle.dumps(
                     Cell(encrypted, IV=init_vector, ctype=CellType.ADD_CON)
                 ))
@@ -336,7 +339,7 @@ class Relay():
                     client_reference["key"],
                     Cell(their_cell, ctype=CellType.CONNECT_RESP)
                 )
-                client_reference.sock.send(pickle.dumps(Cell(
+                client_reference["sock"].send(pickle.dumps(Cell(
                     encrypted,
                     IV=init_vector,
                     ctype=CellType.CONTINUE
@@ -348,7 +351,6 @@ class Relay():
                     client_reference["key"],
                     Cell(their_cell, ctype=CellType.FINISHED)
                 )
-
                 client_reference["sock"].send(pickle.dumps(Cell(
                     encrypted,
                     IV=init_vector,
@@ -429,10 +431,10 @@ class Relay():
 
 def main():
     """Main function"""
-    sys.argv = input("you know the drill. \n")  # added for my debug
-    if len(sys.argv) == 1:  # was 2 -> 1
+    # sys.argv = input("you know the drill. \n")  # added for my debug
+    if len(sys.argv) == 2:  # was 2 -> 1
         identity = 3
-        port = sys.argv[0]  # was 1 ->0
+        port = sys.argv[1]  # was 1 ->0
         if port == "a":
             port = 45000
             identity = 0

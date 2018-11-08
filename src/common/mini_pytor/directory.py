@@ -39,7 +39,8 @@ class DirectoryServer:
 
     def handle_conn(self):
         """Handle an incoming connection to the server."""
-        print("got a connection request.")
+        print("Got a connection request.")
+        print(self.registered_relays)
         relay_socket, _ = self.socket.accept()
         # obtain the data sent over.
         obtained = relay_socket.recv(4096)
@@ -86,7 +87,7 @@ class DirectoryServer:
             self.registered_relays.append(registered_relay_data)
             self.relay_sockets.append(relay_socket)
         elif received_cell.type == CellType.GET_DIRECT:
-            print("got a directory request")
+            print("Got a directory request")
             relay_socket.settimeout(0.03)  # ensure we don't block forever
             relay_socket.send(pickle.dumps(
                 Cell(self.registered_relays, ctype=CellType.GET_DIRECT)))
@@ -123,11 +124,11 @@ class DirectoryServer:
             self.registered_relays.remove(reference2)
             self.relay_sockets.remove(provided_socket)
 
-    def mainloop(self):
-        """Main Loop """
+    def run(self):
+        """Start up directory"""
         while True:
             readready, _, _ = select.select(
-                [self.socket]+self.relay_sockets, [], [])
+                [self.socket] + self.relay_sockets, [], [])
             for i in readready:
                 if i == self.socket:  # is receiving a new connection request.
                     self.handle_conn()
@@ -136,4 +137,4 @@ class DirectoryServer:
 
 
 DIRECTORY = DirectoryServer()
-DIRECTORY.mainloop()
+DIRECTORY.run()
