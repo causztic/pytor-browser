@@ -47,31 +47,30 @@ class DirectoryServer:
     def handleconnection(self):
         """Handle an incoming connection to the server."""
         print("got a connection request.")
-        relaysocket, _ = self.socket.accept()
+        relay_socket, _ = self.socket.accept()
         # obtain the data sent over.
-        obtained = relaysocket.recv(4096)
+        obtained = relay_socket.recv(4096)
         try:
             receivedcell = pickle.loads(obtained)
         except (pickle.PickleError, pickle.PicklingError, pickle.UnpicklingError) as _:
-            relaysocket.close()
+            relay_socket.close()
             return
 
         # ensure it is indeed a cell.
         if not isinstance(receivedcell, Cell):
-            relaysocket.close()
+            relay_socket.close()
             return
 
         if receivedcell.type == CellType.GIVE_DIRECT:
             base_bytearray = receivedcell.salt
             signature = receivedcell.signature
-            publickey = receivedcell.payload
+            public_key = receivedcell.payload
             publickey_bytes = receivedcell.payload
-            portnum = receivedcell.init_vector
-            theirpublickey = serialization.load_pem_public_key(
-                publickey, backend=default_backend())
-
+            port_num = receivedcell.init_vector
+            their_public_key = serialization.load_pem_public_key(
+                public_key, backend=default_backend())
             try:
-                theirpublickey.verify(signature, base_bytearray,
+                their_public_key.verify(signature, base_bytearray,
                                       cryptography.hazmat.primitives.asymmetric.padding.PSS(
                                           mgf=cryptography.hazmat.primitives.asymmetric.padding.MGF1
                                           (hashes.SHA256()),
@@ -79,30 +78,30 @@ class DirectoryServer:
                                       hashes.SHA256())
             except InvalidSignature:
                 # reject. signature validation failed.
-                relaysocket.close()
+                relay_socket.close()
                 return
 
-            ipaddress, _ = relaysocket.getpeername()  # obtain the ip and port of that server.
-            print("Added-> PORT: " + str(portnum) + " IP: " + str(ipaddress))
+            ip_address, _ = relay_socket.getpeername()  # obtain the ip and port of that server.
+            print("Added-> PORT: " + str(port_num) + " IP: " + str(ip_address))
             self.connected_relays.append(
-                Relay(ipaddress, relaysocket, portnum, theirpublickey))
+                Relay(ip_address, relay_socket, port_num, their_public_key))
 
             self.registered_relays.append(
-                RegisteredRelay(ipaddress, portnum, publickey_bytes))
+                RegisteredRelay(ip_address, port_num, publickey_bytes))
 
-            self.relay_sockets.append(relaysocket)
+            self.relay_sockets.append(relay_socket)
             return
 
         elif receivedcell.type == CellType.GET_DIRECT:
             print("got a directory request")
-            relaysocket.settimeout(0.03)  # ensure we don't block forever
-            relaysocket.send(pickle.dumps(
+            relay_socket.settimeout(0.03)  # ensure we don't block forever
+            relay_socket.send(pickle.dumps(
                 Cell(self.registered_relays, ctype=CellType.GET_DIRECT)))
-            relaysocket.recv(4096)
-            relaysocket.close()
+            relay_socket.recv(4096)
+            relay_socket.close()
             return
         else:
-            relaysocket.close()
+            relay_socket.close()
             # reject connection as it does not contain a valid cell.
 
     def handleclosed(self, provided_socket):

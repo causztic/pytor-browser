@@ -152,7 +152,7 @@ class Relay():
             obtained_cell = self.rsa_decrypt(obtained_cell)
 
         except ValueError:  # decryption failure
-            print("Rejected one connection")
+            print("Rejected one connection", file=sys.stderr)
             return None
 
         if RELAY_DEBUG:
@@ -227,7 +227,7 @@ class Relay():
                 ConnectionAbortedError, struct.error,
                 socket.timeout):
             print("failed to connect to other relay. "
-                  + "sending back failure message, or timed out.")
+                  + "sending back failure message, or timed out.", file=sys.stderr)
 
             innercell = pickle.dumps(Cell("CONNECTIONREFUSED", ctype=CellType.FAILED))
             outercell = padder128(pickle.dumps(Cell(innercell, ctype=CellType.FAILED)))
@@ -270,7 +270,7 @@ class Relay():
                 print("length of answer" + str(len(req.content)))
             except requests.exceptions.ConnectionError:
                 req = "ERROR"
-                print("Failed to receive response from website")
+                print("Failed to receive response from website", file=sys.stderr)
 
             payloadbytes = pickle.dumps(req)
             if len(payloadbytes) > 4096:
@@ -404,7 +404,7 @@ class Relay():
                 except (struct.error, ConnectionResetError,
                         socket.timeout, pickle.UnpicklingError,
                         pickle.PickleError):
-                    print("ERROR! might have timed out, or inappropriate data was provided!")
+                    print("ERROR! might have timed out, or inappropriate data was provided!", file=sys.stderr)
                     if client_class is not None:
                         self.CLIENTS.remove(client_class)
                     continue
@@ -422,7 +422,7 @@ class Relay():
 
                 except (struct.error, ConnectionResetError,
                         ConnectionAbortedError, socket.timeout):
-                    print("Client was closed or timed out.")
+                    print("Client was closed or timed out.", file=sys.stderr)
                     # clean up the client and delete.
                     sending_client.sock.close()
                     if sending_client.bounce_socket is not None:

@@ -2,6 +2,7 @@
 
 import pickle
 import os
+import sys
 import json
 import struct
 import socket
@@ -116,7 +117,7 @@ class Client:
 
         except InvalidSignature:
             if CLIENT_DEBUG:
-                print("Something went wrong.. Signature was invalid.")
+                print("Something went wrong.. Signature was invalid.", file=sys.stderr)
             return None
 
     @staticmethod
@@ -176,7 +177,7 @@ class Client:
                 print("verification of signature failed/Invalid cell was received.")
                 return
         except (struct.error, ConnectionResetError, ConnectionRefusedError):
-            print("disconnected or relay is not online/ connection was refused.")
+            print("disconnected or relay is not online/ connection was refused.", file=sys.stderr)
 
     def more_connect_1(self, gonnect, gonnectport, intermediate_relays, rsa_key):
         """Connect to the next relay through the first one."""
@@ -228,7 +229,7 @@ class Client:
 
         except (ConnectionResetError, ConnectionRefusedError, struct.error):
             if CLIENT_DEBUG:
-                print("Socket Error, removing from the list.")
+                print("Socket Error, removing from the list.", file=sys.stderr)
             del self.relay_list[0]  # remove it from the lsit
             if CLIENT_DEBUG:
                 print("REMOVED relay 0 DUE TO FAILED CONNECTION")
@@ -299,7 +300,7 @@ class Client:
                 print("connected successfully to relay @ " + gonnect
                       + "   Port: " + str(gonnectport))
         except struct.error:
-            print("socket error occurred")
+            print("socket error occurred", file=sys.stderr)
 
     @staticmethod
     def req_wrapper(request, relay_list):
@@ -418,7 +419,7 @@ class Client:
                     return Client.failure()  # return failure
 
         except struct.error:
-            print("socketerror")
+            print("socketerror", file=sys.stderr)
 
     def close(self):  # to close things.
         """Run at the end of a client call to CLOSE all sockets"""
@@ -428,7 +429,7 @@ class Client:
     @staticmethod
     def failure():
         """Default Error message."""
-        print("some form of data corruption occurred, or no reply was obtained.")
+        print("some form of data corruption occurred, or no reply was obtained.", file=sys.stderr)
         return json.dumps({"content": "", "status": 404})
 
 
