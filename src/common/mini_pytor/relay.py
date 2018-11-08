@@ -272,7 +272,6 @@ class Relay():
                 req = "ERROR"
                 print("Failed to receive response from website")
 
-            print(type(req))
             payloadbytes = pickle.dumps(req)
             if len(payloadbytes) > 4096:
                 # print("was larger")

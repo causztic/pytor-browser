@@ -325,6 +325,20 @@ class Client:
         return sending_cell
 
     @staticmethod
+    def chain_decryptor(list_of_intermediate_relays, provided_cell):
+        """decrypt something given a list the intermediate relay list and the cell"""
+        counter = 0
+        while counter < len(list_of_intermediate_relays):
+            decrypted = Client.aes_decryptor(list_of_intermediate_relays[counter].key,
+                                             provided_cell)
+            provided_cell = pickle.loads(decrypted)
+            counter += 1
+            if counter < len(list_of_intermediate_relays):
+                provided_cell = provided_cell.payload
+
+        return provided_cell
+
+    @staticmethod
     def req(request, intermediate_relays):
         """send out stuff in router."""
         if CLIENT_DEBUG:
@@ -332,7 +346,7 @@ class Client:
         # must send IV and a cell that is encrypted with the next public key
         # public key list will have to be accessed in order with list of relays
         # connection type. exit node always knows
-        sending_cell = Client.req_wrapper(request,intermediate_relays)
+        sending_cell = Client.req_wrapper(request, intermediate_relays)
         try:
             sock = intermediate_relays[0].sock
             sock.send(pickle.dumps(sending_cell))
@@ -347,19 +361,13 @@ class Client:
                 print("received cell payload")
                 print(their_cell.payload)
 
-            counter = 0
-            while counter < len(intermediate_relays):
-                decrypted = Client.aes_decryptor(intermediate_relays[counter].key, their_cell)
-                their_cell = pickle.loads(decrypted)
-                counter += 1
-                if counter < len(intermediate_relays):
-                    their_cell = their_cell.payload
+            their_cell = Client.chain_decryptor(intermediate_relays, their_cell)
 
             if their_cell.type == CellType.FAILED:
                 if CLIENT_DEBUG:
                     print("FAILED AT CONNECTION!")
-                    print(json.dumps({"content": "", "status": 404}))
-                    return None
+                    print("some form of data corruption occurred.")
+                    return json.dumps({"content": "", "status": 404})
 
             elif their_cell.type == CellType.CONTINUE:
                 if CLIENT_DEBUG:
@@ -376,16 +384,8 @@ class Client:
                     if CLIENT_DEBUG:
                         print("received cell payload")
                         print(their_cell.payload)
-                    counter = 0
 
-                    while counter < len(intermediate_relays):
-                        decrypted = Client.aes_decryptor(intermediate_relays[counter].key,
-                                                         their_cell)
-                        their_cell = pickle.loads(decrypted)
-                        counter += 1
-                        if counter < len(intermediate_relays):
-                            their_cell = their_cell.payload
-
+                    their_cell = Client.chain_decryptor(intermediate_relays, their_cell)
                     summation += their_cell.payload
 
                 response = bytes(summation)  # take the sum of all your bytes
@@ -404,7 +404,8 @@ class Client:
 
                 else:
                     # Reaching this branch implies data corruption of some form
-                    print(json.dumps({"content": "", "status": 404}))
+                    print("some form of data corruption occurred.")
+                    return json.dumps({"content": "", "status": 404})
 
             else:
                 response = pickle.loads(their_cell.payload)
@@ -418,7 +419,8 @@ class Client:
                     return response
                 else:
                     # Reaching this branch implies data corruption of some form
-                    print(json.dumps({"content": "", "status": 404}))
+                    print("some form of data corruption occurred.")
+                    return json.dumps({"content": "", "status": 404})
 
         except struct.error:
             print("socketerror")
@@ -434,7 +436,6 @@ class Responder(BaseHTTPRequestHandler):
     def do_GET(self):
         """Get request response method"""
         my_client = Client()
-        print("get")  # DEBUGGER
         relay_list = my_client.getdirectoryitems()  # Get references from directories.
         public_key1 = serialization.load_pem_public_key(
             relay_list[0].key, backend=default_backend())
@@ -448,7 +449,13 @@ class Responder(BaseHTTPRequestHandler):
         my_client.more_connect_2(relay_list[2].ip, relay_list[2].port, my_client.relay_list,
                                  public_key3)
         obtained_response = my_client.req(self.path[2:], my_client.relay_list)
-
+        if isinstance(obtained_response, str):
+            self.send_response(404)  # TODO something.
+            self.send_header('Content-type', 'text/html')
+            self.end_headers()
+            self.wfile.write(str.encode(obtained_response))
+            my_client.close()
+            return
         self.send_response(obtained_response.status_code)
         self.send_header('Content-type', 'text/html')
         self.end_headers()
