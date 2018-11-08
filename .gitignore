@@ -1,10 +1,20 @@
+# Node and Yarn
 node_modules
+yarn-error.log
+
+# Distribution/Build folder
 dist
-.DS_Store
+
+# VScode settings
 .vscode
 
+# OSX file
+.DS_Store
+
+# Cache-related directories
 .mypy_cache
 __pycache__
+
 # Covers JetBrains IDEs: IntelliJ, RubyMine, PhpStorm, AppCode, PyCharm, CLion, Android Studio and WebStorm
 # Reference: https://intellij-support.jetbrains.com/hc/en-us/articles/206544839
 # Compiled python modules.
@@ -81,5 +91,3 @@ fabric.properties
 
 # Android studio 3.1+ serialized cache file
 .idea/caches/build_file_checksums.ser
-.vscode
-yarn-error.log
