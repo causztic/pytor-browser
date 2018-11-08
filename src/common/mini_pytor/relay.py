@@ -358,22 +358,10 @@ class Relay():
                 print(their_cell.type)
             if their_cell.type != CellType.FINISHED:
                 print("got answer back.. as a relay.")
-                # print(len(their_cell))
-                # print(their_cell)
-                init_vector = os.urandom(16)
-                cipher = Cipher(
-                    algorithms.AES(client_reference.key),
-                    modes.CBC(init_vector),
-                    backend=default_backend()
+                encrypted, init_vector = Relay.aes_encryptor(
+                    client_reference.key,
+                    padder128(pickle.dumps(Cell(their_cell, ctype=CellType.CONNECT_RESP)))
                 )
-                encryptor = cipher.encryptor()
-                encrypted = encryptor.update(
-                    padder128(pickle.dumps(Cell(
-                        their_cell,
-                        ctype=CellType.CONNECT_RESP
-                    )))
-                )
-                encrypted += encryptor.finalize()
                 client_reference.sock.send(pickle.dumps(Cell(
                     encrypted,
                     IV=init_vector,
@@ -382,22 +370,13 @@ class Relay():
                 print("relayed a packet.")
             else:
                 print("received the last packet.")
-                # print(len(their_cell))
-                # print(their_cell)
-                init_vector = os.urandom(16)
-                cipher = Cipher(
-                    algorithms.AES(client_reference.key),
-                    modes.CBC(init_vector),
-                    backend=default_backend()
+                encrypted, init_vector = Relay.aes_encryptor(
+                    client_reference.key,
+                    padder128(
+                        pickle.dumps(Cell(their_cell, ctype=CellType.FINISHED))
+                    )
                 )
-                encryptor = cipher.encryptor()
-                encrypted = encryptor.update(
-                    padder128(pickle.dumps(Cell(
-                        their_cell,
-                        ctype=CellType.FINISHED
-                    )))
-                )
-                encrypted += encryptor.finalize()
+
                 client_reference.sock.send(pickle.dumps(Cell(
                     encrypted,
                     IV=init_vector,
@@ -439,7 +418,7 @@ class Relay():
                             sending_client = k  # identify the sending client.
                     received = i.recv(4096)
                     print("got a packet from an existing client")
-                    if not received:
+                    if not received:  # received.. None. shouldn't be possible but in case.
                         raise ConnectionResetError
 
                 except (struct.error, ConnectionResetError,
@@ -455,6 +434,7 @@ class Relay():
 
                 gotten_cell = pickle.loads(received)
                 decrypted = self.aes_decryptor(sending_client.key, gotten_cell)
+                # decrypt the obtained cell
                 cell_to_next = pickle.loads(decrypted)
 
                 if RELAY_DEBUG:

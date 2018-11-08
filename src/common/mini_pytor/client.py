@@ -3,11 +3,9 @@
 import pickle
 import os
 import json
-import sys
 import struct
-import requests
 import socket
-
+import requests
 import cryptography.hazmat.primitives.asymmetric.padding
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives.asymmetric import ec
@@ -304,6 +302,29 @@ class Client:
             print("socket error occurred")
 
     @staticmethod
+    def req_wrapper(request,relay_list):
+        sending_cell = Cell(request, ctype=CellType.REQ)
+        # generate True payload
+
+        init_vector, encrypted_cell = Client.aes_encryptor(relay_list[2].key, sending_cell)
+        sending_cell = Cell(encrypted_cell, IV=init_vector, ctype=CellType.RELAY)
+        sending_cell.ip_addr = relay_list[2].ip_addr
+        sending_cell.port = relay_list[2].port
+        sending_cell = Cell(pickle.dumps(sending_cell), ctype=CellType.RELAY)
+
+        init_vector, encrypted_cell = Client.aes_encryptor(relay_list[1].key, sending_cell)
+        sending_cell = Cell(encrypted_cell, IV=init_vector, ctype=CellType.RELAY)
+        sending_cell.ip_addr = relay_list[1].ip_addr
+        sending_cell.port = relay_list[1].port
+        sending_cell = Cell(pickle.dumps(sending_cell), ctype=CellType.RELAY)
+
+        init_vector, encrypted_cell = Client.aes_encryptor(relay_list[0].key, sending_cell)
+        sending_cell = Cell(encrypted_cell, IV=init_vector, ctype=CellType.RELAY)
+        sending_cell.ip_addr = relay_list[0].ip_addr
+        sending_cell.port = relay_list[0].port
+        return sending_cell
+
+    @staticmethod
     def req(request, intermediate_relays):
         """send out stuff in router."""
         if CLIENT_DEBUG:
@@ -311,25 +332,7 @@ class Client:
         # must send IV and a cell that is encrypted with the next public key
         # public key list will have to be accessed in order with list of relays
         # connection type. exit node always knows
-        sending_cell = Cell(request, ctype=CellType.REQ)
-        # generate True payload
-
-        init_vector, encrypted_cell = Client.aes_encryptor(intermediate_relays[2].key, sending_cell)
-        sending_cell = Cell(encrypted_cell, IV=init_vector, ctype=CellType.RELAY)
-        sending_cell.ip_addr = intermediate_relays[2].ip_addr
-        sending_cell.port = intermediate_relays[2].port
-        sending_cell = Cell(pickle.dumps(sending_cell), ctype=CellType.RELAY)
-
-        init_vector, encrypted_cell = Client.aes_encryptor(intermediate_relays[1].key, sending_cell)
-        sending_cell = Cell(encrypted_cell, IV=init_vector, ctype=CellType.RELAY)
-        sending_cell.ip_addr = intermediate_relays[1].ip_addr
-        sending_cell.port = intermediate_relays[1].port
-        sending_cell = Cell(pickle.dumps(sending_cell), ctype=CellType.RELAY)
-
-        init_vector, encrypted_cell = Client.aes_encryptor(intermediate_relays[0].key, sending_cell)
-        sending_cell = Cell(encrypted_cell, IV=init_vector, ctype=CellType.RELAY)
-        sending_cell.ip_addr = intermediate_relays[0].ip_addr
-        sending_cell.port = intermediate_relays[0].port
+        sending_cell = Client.req_wrapper(request,intermediate_relays)
         try:
             sock = intermediate_relays[0].sock
             sock.send(pickle.dumps(sending_cell))
@@ -427,7 +430,9 @@ class Client:
 
 
 class Responder(BaseHTTPRequestHandler):
+    """Mini HTTP server"""
     def do_GET(self):
+        """Get request response method"""
         my_client = Client()
         print("get")  # DEBUGGER
         relay_list = my_client.getdirectoryitems()  # Get references from directories.
