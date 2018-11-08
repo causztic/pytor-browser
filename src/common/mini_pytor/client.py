@@ -18,7 +18,6 @@ from cryptography.exceptions import InvalidSignature
 import util
 from cell import Cell, CellType
 
-
 class Client:
     """Client class"""
 
@@ -331,39 +330,35 @@ class Client:
             sock.send(pickle.dumps(sending_cell))
             recv_cell = sock.recv(8192)
             their_cell = pickle.loads(recv_cell)
-
             if util.CLIENT_DEBUG:
                 print("received cell")
                 print(len(recv_cell))
                 print(recv_cell)
                 print("received cell payload")
                 print(their_cell.payload)
-
             their_cell = Client.chain_decryptor(
                 intermediate_relays, their_cell)
-
             if their_cell.type == CellType.FAILED:
-                if util.CLIENT_DEBUG:
-                    print("FAILED AT CONNECTION!", file=sys.stderr)
-                    return Client.failure()  # return failure
-            elif their_cell.type == CellType.CONTINUE:
-                return Client._req_continue(
-                    their_cell, sock, intermediate_relays)
-            else:
-                response = pickle.loads(their_cell.payload)
-                if isinstance(response, requests.models.Response):
-                    if util.CLIENT_DEBUG:
-                        print(response.content, file=sys.stderr)
-                        print(response.status_code, file=sys.stderr)
-                    return_dict = {
-                        "content": response.content.decode(response.encoding),
-                        "status code": response.status_code
-                    }
-                    print(json.dumps(return_dict))
-                    return response
-                # Reaching this branch implies data corruption of some form
+                print("FAILED AT CONNECTION!", file=sys.stderr)
                 return Client.failure()  # return failure
 
+            if their_cell.type == CellType.CONTINUE:
+                return Client._req_continue(
+                    their_cell, sock, intermediate_relays)
+
+            response = pickle.loads(their_cell.payload)
+            if isinstance(response, requests.models.Response):
+                if util.CLIENT_DEBUG:
+                    print(response.content, file=sys.stderr)
+                    print(response.status_code, file=sys.stderr)
+                return_dict = {
+                    "content": response.content.decode(response.encoding),
+                    "status code": response.status_code
+                }
+                print(json.dumps(return_dict))
+                return response
+            # Reaching this branch implies data corruption of some form
+            return Client.failure()  # return failure
         except struct.error:
             print("socketerror", file=sys.stderr)
 
