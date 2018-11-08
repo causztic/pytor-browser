@@ -1,0 +1,9 @@
+{
+  "extends": ["airbnb-base", "plugin:vue/essential"],
+  "rules": {
+    "no-console": "off",
+    "no-unused-vars": ["error", { "argsIgnorePattern": "^_" }],
+    "import/no-extraneous-dependencies": "off",
+    "function-paren-newline": ["error", "multiline"]
+  }
+}

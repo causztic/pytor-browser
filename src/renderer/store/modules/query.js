@@ -1,10 +1,11 @@
-import { spawnClient } from "common/util";
+// eslint-disable-next-line import/no-unresolved
+import { spawnClient } from 'common/util';
 
 // initial state
 const state = {
   history: [],
   response: null,
-  status: null
+  status: null,
 };
 
 // getters
@@ -14,28 +15,28 @@ const getters = {};
 const actions = {
   getWebsite({ dispatch, commit }, website) {
     dispatch('status/load', null, { root: true });
-    commit("setResponse", null);
+    commit('setResponse', null);
     const result = spawnClient(website);
 
     console.log(result);
 
-    result.stdout.on("data", data => {
+    result.stdout.on('data', (data) => {
       console.log(`stdout: ${data}`);
 
-      commit("addQueryToHistory", website);
-      commit("setResponse", data);
+      commit('addQueryToHistory', website);
+      commit('setResponse', data);
     });
 
-    result.stderr.on("data", data => {
+    result.stderr.on('data', (data) => {
       console.log(`stderr: ${data}`);
-      commit("setResponse", null);
+      commit('setResponse', null);
     });
 
-    result.on("close", code => {
+    result.on('close', (code) => {
       console.log(`child process exited with code ${code}`);
       dispatch('status/connected', null, { root: true });
     });
-  }
+  },
 };
 
 // mutations
@@ -45,7 +46,7 @@ const mutations = {
   },
   setResponse(state, response) {
     state.response = response;
-  }
+  },
 };
 
 export default {
@@ -53,5 +54,5 @@ export default {
   state,
   getters,
   actions,
-  mutations
+  mutations,
 };

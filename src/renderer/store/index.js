@@ -1,16 +1,17 @@
-import Vue from "vue";
-import Vuex from "vuex";
+import Vue from 'vue';
+import Vuex from 'vuex';
 
-import query from "./modules/query";
-import status from "./modules/status";
-import { isDevelopment } from "common/util";
+// eslint-disable-next-line import/no-unresolved
+import { isDevelopment } from 'common/util';
+import query from './modules/query';
+import status from './modules/status';
 
 Vue.use(Vuex);
 
 export default new Vuex.Store({
   modules: {
     query,
-    status
+    status,
   },
-  strict: isDevelopment
+  strict: isDevelopment,
 });

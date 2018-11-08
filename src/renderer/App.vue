@@ -86,23 +86,23 @@
 </template>
 
 <script>
-  import LoadingComponent from './components/LoadingComponent.vue';
-  import SettingsComponent from './components/SettingsComponent.vue';
-  import BrowserComponent from './components/BrowserComponent.vue';
+import LoadingComponent from './components/LoadingComponent.vue';
+import SettingsComponent from './components/SettingsComponent.vue';
+import BrowserComponent from './components/BrowserComponent.vue';
 
-  export default {
-    name: 'app',
-    components: { LoadingComponent, SettingsComponent, BrowserComponent },
-    data() {
-      return {
-        url: "https://www.motherfuckingwebsite.com",
-        fired: false,
-      }
+export default {
+  name: 'app',
+  components: { LoadingComponent, SettingsComponent, BrowserComponent },
+  data() {
+    return {
+      url: 'https://www.motherfuckingwebsite.com',
+      fired: false,
+    };
+  },
+  methods: {
+    navigate() {
+      this.fired = true;
     },
-    methods: {
-      navigate: function () {
-        this.fired = true;
-      }
-    }
-  }
+  },
+};
 </script>

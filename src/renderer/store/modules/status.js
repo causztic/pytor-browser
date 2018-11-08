@@ -1,71 +1,72 @@
-// initial state
-import { spawnServers } from "common/util";
+// eslint-disable-next-line import/no-unresolved
+import { spawnServers } from 'common/util';
 
 const state = {
-  message: "You are not connected to the network.",
+  message: 'You are not connected to the network.',
   connected: false,
-  connection_state: "not_connected",
+  connectionState: 'not_connected',
 };
 
 const actions = {
   load({ commit }) {
-    commit("loading");
+    commit('loading');
   },
   connected({ commit }) {
-    commit("connected");
+    commit('connected');
   },
   startServers({ commit, state }) {
     if (!state.connected) {
       const instances = spawnServers();
-      commit("connecting");
+      commit('connecting');
       return new Promise((resolve, _) => {
         // TODO: check for server timeouts
         // TODO: update to check for exact server startup
-        for (let instance of instances) {
-          instance.stdout.on("data", data => {
+        instances.forEach((instance) => {
+          instance.stdout.on('data', (data) => {
             console.log(`stdin: ${data}`);
           });
 
-          instance.stderr.on("data", data => {
+          instance.stderr.on('data', (data) => {
             console.log(`stderr: ${data}`);
           });
 
-          instance.on("close", code => {
+          instance.on('close', (code) => {
             console.log(`child process exited with code ${code}`);
           });
-        }
+        });
 
         setTimeout(() => {
-          commit("connected");
+          commit('connected');
           resolve();
         }, 300);
       });
-    } else {
-      return new Promise((resolve, _) => { resolve() });
     }
-  }
+    return new Promise((resolve, _) => {
+      resolve();
+    });
+  },
 };
 
 const mutations = {
   connecting(state) {
-    state.message = "Connecting..";
-    state.connection_state = "connecting";
-    PopStateEvent.connected = false;
+    state.message = 'Connecting..';
+    state.connectionState = 'connecting';
+    state.connected = false;
   },
   loading(state) {
-    state.message = "Loading page..";
-    state.connection_state = "connecting";
+    state.message = 'Loading page..';
+    state.connectionState = 'connecting';
   },
   connected(state) {
-    state.message = "Connected to network.";
-    state.connection_state = "connected";
+    state.message = 'Connected to network.';
+    state.connectionState = 'connected';
     state.connected = true;
-  }
+  },
 };
 
 export default {
   namespaced: true,
   state,
   actions,
-  mutations
+  mutations,
 };
