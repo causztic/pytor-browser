@@ -11,6 +11,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import serialization
 from cell import Cell, CellType
 
+
 class Relay():
     """Relay data class"""
     def __init__(self, ipaddr, socketinput, portnum, publickey):
@@ -45,7 +46,7 @@ class DirectoryServer():
         self.lasttime = time.time()
         self.registered_relays = []
         self.identities = []
-        self.relay_sockets=[]
+        self.relay_sockets = []
         for i in range(100):
             self.identities.append(i)  # add 1 to 100 for the identities.
         self.connected_relays = []
@@ -70,7 +71,7 @@ class DirectoryServer():
                     obtained = relaysocket.recv(4096)
                     try:
                         receivedcell = pickle.loads(obtained)
-                    except (pickle.PickleError, pickle.PicklingError, pickle.UnpicklingError) as error:
+                    except (pickle.PickleError, pickle.PicklingError, pickle.UnpicklingError) as _:
                         continue
 
                     # ensure it is indeed a cell.
@@ -100,7 +101,7 @@ class DirectoryServer():
                             print("Added-> PORT: "+str(portnum)+" IP: "+str(ipaddress))
                             self.connected_relays.append(
                                 Relay(ipaddress, relaysocket, portnum, theirpublickey))
-                            self.registered_relays.append(RegisteredRelay(ipaddress,portnum,publickey_bytes))
+                            self.registered_relays.append(RegisteredRelay(ipaddress, portnum, publickey_bytes))
                             self.relay_sockets.append(relaysocket)
 
                         elif receivedcell.type == CellType.GET_DIRECT:
@@ -116,17 +117,18 @@ class DirectoryServer():
                             # reject connection as it does not contain a valid cell.
                 else:
                     reference = None
+                    reference2 = None
                     print("got something from existing.")
                     # implies that it is closed though.
                     try:
                         i.recv(4096)
-                    except ConnectionError:
+                    except (ConnectionResetError, ConnectionError) as _:
                         for k in self.connected_relays:
                             if k.socket == i:
                                 # i.e it is part of the registered relays list
                                 reference = k
                         for k in self.registered_relays:
-                            if k.ip==reference.ip and k.port==reference.port:
+                            if k.ip == reference.ip and k.port == reference.port:
                                 # i.e it is part of the registered relays list
                                 reference2 = k
 
@@ -134,10 +136,9 @@ class DirectoryServer():
                         print("Removed relay with IP: " + str(reference.ip) + " Port: " + str(reference.port))
                         i.close()
                         print("closed connection to relay.")
-                        self.registered_relays.remove(reference)
-                        self.connected_relays.remove(reference2)
+                        self.connected_relays.remove(reference)
+                        self.registered_relays.remove(reference2)
                         self.relay_sockets.remove(i)
-
 
 
 a = DirectoryServer()

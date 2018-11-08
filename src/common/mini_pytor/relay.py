@@ -48,35 +48,41 @@ class Relay():
         temp_open = open(pem_file, "rb")
         self.true_private_key = serialization.load_pem_private_key(
             temp_open.read(), password=None, backend=default_backend())  # used for signing, etc.
-        # public key for sending out.
         self.sendingpublickey = self.true_private_key.public_key()
-        # obtain the serialised public key for directory
-        serialised_public_key = self.sendingpublickey.public_bytes(
 
+        serialised_public_key = self.sendingpublickey.public_bytes(
             encoding=serialization.Encoding.PEM,
             format=serialization.PublicFormat.SubjectPublicKeyInfo)
-        base_bytearray = os.urandom(128)  # generate random bytearray with 128 bytes.
-        signedbytearray= self.true_private_key.sign(
-            base_bytearray,
-            cryptography.hazmat.primitives.asymmetric.padding.PSS(
+        # obtain the serialised public key for directory
+        base_bytearray = os.urandom(128)
+        # generate random bytearray with 128 bytes.
+        signedbytearray = self.sign(base_bytearray)
+
+        directorycell = Cell(serialised_public_key, signature=signedbytearray,
+                             salt=base_bytearray, IV=port_number, ctype=CellType.GIVE_DIRECT)
+        # store the byte array, signed version, serialised public key, and actual port number for sending.
+
+        self.directory_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.directory_socket.connect((socket.gethostbyname(socket.gethostname()), 50000))
+        # connect to the directory server.
+        self.directory_socket.send(pickle.dumps(directorycell))
+
+        # begin listening for clientele.
+        self.relay_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.relay_socket.bind(("", port_number))
+        self.relay_socket.listen(100)
+
+    def sign(self, given_bytes):
+        """Signs stuff."""
+        signed_bytes = self.true_private_key.sign(  # sign byte array to prove you own the key
+            given_bytes, cryptography.hazmat.primitives.asymmetric.padding.PSS(
                 mgf=cryptography.hazmat.primitives.asymmetric.padding.MGF1(
                     algorithm=hashes.SHA256()),
-                salt_length=cryptography.hazmat.primitives
-                    .asymmetric.padding.PSS.MAX_LENGTH
+                salt_length=cryptography.hazmat.primitives.asymmetric.padding.PSS.MAX_LENGTH
             ),
             hashes.SHA256()
         )
-        DirectoryCell = Cell(serialised_public_key, signature=signedbytearray,
-                             salt=base_bytearray, IV=port_number, ctype=CellType.GIVE_DIRECT)
-        # store the byte array, signed version, serialised public key, and actual port number for calling.
-        self.directory_socket = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
-        self.directory_socket.connect((socket.gethostbyname(socket.gethostname()),50000))
-        self.directory_socket.send(pickle.dumps(DirectoryCell))
-        # tcp type chosen for first.
-        self.relay_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        # better be "" or it'll listen only on localhost
-        self.relay_socket.bind(("", port_number))
-        self.relay_socket.listen(100)
+        return signed_bytes
 
     def exchange_keys(self, client_sock, obtained_cell):
         """Exchange Key with someone, obtaining a shared secret.
@@ -121,7 +127,7 @@ class Relay():
         client_sock.send(pickle.dumps(reply_cell))
         return private_key, derived_key
 
-    def decrypt(self, thing):
+    def rsa_decrypt(self, thing):
         """thing that is in RSA encryption must be decrypted before continuing."""
         return self.true_private_key.decrypt(
             thing,
@@ -133,6 +139,133 @@ class Relay():
             )
         )
 
+    @staticmethod
+    def aes_encryptor(secret_key, provided_cell):
+        pass
+
+    @staticmethod
+    def aes_decryptor(secret_key, provided_cell):
+        """Decrypt provided_cell's payload with an AES key"""
+        cipher = Cipher(
+            algorithms.AES(secret_key),
+            modes.CBC(provided_cell.init_vector),
+            backend=default_backend()
+        )
+        decryptor = cipher.decryptor()
+        decrypted = decryptor.update(provided_cell.payload)
+        decrypted += decryptor.finalize()  # finalise decryption
+        return decrypted
+
+    def handle_client(self, client_sock):
+        """A method to handle client connections."""
+        obtained_cell = client_sock.recv(4096)
+        try:
+            if RELAY_DEBUG:
+                print("raw data obtained. (Cell)")
+                print(obtained_cell)
+            # decrypt the item.
+            obtained_cell = self.rsa_decrypt(obtained_cell)
+
+        except ValueError:  # decryption failure
+            print("Rejected one connection")
+            return None
+
+        if RELAY_DEBUG:
+            print("Decrypted cell with actual keys.")
+            print(obtained_cell)
+
+        obtained_cell = pickle.loads(obtained_cell)  # attempt to load cell. if error is raised, outside will catch
+        if RELAY_DEBUG:
+            print("after pickle load")
+            print(obtained_cell)
+        if obtained_cell.type != CellType.ADD_CON:  # wrongly generated cell!
+            return None
+
+        generated_privkey, derived_key = self.exchange_keys(client_sock, obtained_cell)
+        client_class = Client(client_sock, derived_key, generated_privkey)
+        client_name = client_class.sock.getpeername()
+        self.CLIENTS.append(client_class)
+        self.CLIENT_SOCKS.append(client_sock)
+        print(f"Connected to client:{client_name}\n\n\n")
+        return client_class
+
+    @staticmethod
+    def extend_circuit(self, cell_to_next, decrypted, client_reference, socket_to_client):
+        init_vector = os.urandom(16)
+        cipher = Cipher(
+            algorithms.AES(client_reference.key),
+            modes.CBC(init_vector),
+            backend=default_backend()
+        )
+        encryptor = cipher.encryptor()
+        try:
+            sock = socket.socket(
+                socket.AF_INET, socket.SOCK_STREAM)
+            sock.connect((cell_to_next.ip_addr, cell_to_next.port))
+            if RELAY_DEBUG:
+                print((cell_to_next.ip_addr, cell_to_next.port))
+                print("cell to next")
+                print(decrypted)
+                print("payload")
+                print(cell_to_next.payload)
+            # send over the cell payload
+            sock.send(cell_to_next.payload)
+            their_cell = sock.recv(4096)  # await answer
+            if RELAY_DEBUG:
+                print("got values")
+                print(their_cell)
+            if their_cell == b"":
+                encrypted = encryptor.update(padder128(
+                    pickle.dumps(Cell("", ctype=CellType.FAILED))))
+                encrypted += encryptor.finalize()
+                if RELAY_DEBUG:
+                    print("sent failed")
+                socket_to_client.send(pickle.dumps(Cell(
+                    encrypted,
+                    IV=init_vector,
+                    ctype=CellType.FAILED)))
+            else:
+                encrypted = encryptor.update(
+                    padder128(pickle.dumps(Cell(
+                        their_cell,
+                        ctype=CellType.CONNECT_RESP
+                    )))
+                )
+                encrypted += encryptor.finalize()
+                if RELAY_DEBUG:
+                    print("sent valid response")
+                socket_to_client.send(pickle.dumps(Cell(
+                    encrypted,
+                    IV=init_vector,
+                    ctype=CellType.FINISHED
+                )))
+                client_reference.bounce_ip = cell_to_next.ip_addr
+                client_reference.bounce_port = cell_to_next.port
+                client_reference.bounce_socket = sock
+                print("Connection success.\n\n\n\n\n")
+        except (ConnectionRefusedError, ConnectionResetError,
+                ConnectionAbortedError, struct.error,
+                socket.timeout):
+            print("failed to connect to other relay. "
+                  + "sending back failure message, or timed out.")
+            encrypted = encryptor.update(
+                padder128(
+                    pickle.dumps(Cell(
+                        pickle.dumps(Cell(
+                            "CONNECTIONREFUSED",
+                            ctype=CellType.FAILED
+                        )),
+                        ctype=CellType.FAILED
+                    )))
+            )
+            encrypted += encryptor.finalize()
+            socket_to_client.send(pickle.dumps(Cell(
+                encrypted,
+                IV=init_vector,
+                ctype=CellType.FAILED
+            )))
+            print("sent back failure message.")
+
     def run(self):
         """main method"""
         client_class = None  # initialise as none.
@@ -142,54 +275,18 @@ class Relay():
             if i == self.relay_socket:  # i've gotten a new connection
                 print("Client connecting...")
                 client_sock, _ = self.relay_socket.accept()
-                # clientsocket.setblocking(0)
                 client_sock.settimeout(0.3)
                 try:
-                    # obtain their public key
-                    obtained_cell = client_sock.recv(4096)
-                    try:
-                        if RELAY_DEBUG:
-                            print("raw data obtained. (Cell)")
-                            print(obtained_cell)
-                        # decrypt the item.
-                        obtained_cell = self.decrypt(obtained_cell)
-
-                    # this is due to decryption failure.
-                    except ValueError:
-                        if client_class is not None:
-                            self.CLIENTS.remove(client_class)
-                            # just in case.
-                            # otherwise, it should continue
-                        print("Rejected one connection")
+                    client_class = self.handle_client(client_sock)
+                    if not client_class:  # client class is None
                         continue
 
-                    if RELAY_DEBUG:
-                        print("Decrypted cell with actual keys.")
-                        print(obtained_cell)
-                    # i.e grab the cell that was passed forward.
-                    obtained_cell = pickle.loads(obtained_cell)
-                    if RELAY_DEBUG:
-                        print("after pickle load")
-                        print(obtained_cell)
-                    if obtained_cell.type != CellType.ADD_CON:
-                        break  # it was not a connection request.
-                    # obtain the generated public key, and the derived key.
-                    generated_privkey, derived_key = self.exchange_keys(
-                        client_sock, obtained_cell)
-                    client_class = Client(
-                        client_sock, derived_key, generated_privkey)
-                    self.CLIENTS.append(client_class)
-                    self.CLIENT_SOCKS.append(client_sock)
-                    client_name = client_class.sock.getpeername()
-                    print(f"Connected to client:{client_name}\n\n\n")
-
-                # error is socket error here.
-                except (struct.error, ConnectionResetError, socket.timeout):
-                    print("socket ERROR! might have timed out.")
+                except (struct.error, ConnectionResetError,
+                        socket.timeout, pickle.UnpicklingError,
+                        pickle.PickleError):
+                    print("ERROR! might have timed out, or inappropriate data was provided!")
                     if client_class is not None:
                         self.CLIENTS.remove(client_class)
-                        # just in case.
-                        # otherwise, it should continue
                     continue
 
             else:  # came from an existing client.
@@ -197,10 +294,9 @@ class Relay():
                 try:
                     for k in self.CLIENTS:
                         if k.sock == i:
-                            sending_client = k
+                            sending_client = k  # identify the sending client.
                     received = i.recv(4096)
                     print("got a packet from an existing client")
-                    print(received)
                     if not received:
                         raise ConnectionResetError
                 except (struct.error, ConnectionResetError,
@@ -212,107 +308,20 @@ class Relay():
                     self.CLIENT_SOCKS.remove(i)
                     self.CLIENTS.remove(sending_client)
                     continue
-                # received_data = self.decrypt(received)
                 gotten_cell = pickle.loads(received)
-                derived_key = sending_client.key  # take his derived key
-                cipher = Cipher(
-                    algorithms.AES(derived_key),
-                    modes.CBC(gotten_cell.init_vector),
-                    backend=default_backend()
-                )
-                decryptor = cipher.decryptor()
-                decrypted = decryptor.update(gotten_cell.payload)
-                decrypted += decryptor.finalize()
+                decrypted = self.aes_decryptor(sending_client.key, gotten_cell)
                 cell_to_next = pickle.loads(decrypted)
+
                 if RELAY_DEBUG:
                     print(f"Cell type: {cell_to_next.type}")
-                # is a request for a relay connect
-                if cell_to_next.type == CellType.RELAY_CONNECT:
-                    try:
-                        # your connection is TCP.
-                        sock = socket.socket(
-                            socket.AF_INET, socket.SOCK_STREAM)
-                        sock.connect((cell_to_next.ip_addr, cell_to_next.port))
-                        if RELAY_DEBUG:
-                            print((cell_to_next.ip_addr, cell_to_next.port))
-                            print("cell to next")
-                            print(decrypted)
-                            print("payload")
-                            print(cell_to_next.payload)
-                        # send over the cell payload
-                        sock.send(cell_to_next.payload)
-                        their_cell = sock.recv(4096)  # await answer
-                        if RELAY_DEBUG:
-                            print("got values")
-                            print(their_cell)
-                        init_vector = os.urandom(16)
-                        cipher = Cipher(
-                            algorithms.AES(derived_key),
-                            modes.CBC(init_vector),
-                            backend=default_backend()
-                        )
-                        encryptor = cipher.encryptor()
-                        if their_cell == b"":
-                            encrypted = encryptor.update(padder128(
-                                pickle.dumps(Cell("", ctype=CellType.FAILED))))
-                            encrypted += encryptor.finalize()
-                            if RELAY_DEBUG:
-                                print("sent failed")
-                            i.send(pickle.dumps(Cell(
-                                encrypted,
-                                IV=init_vector,
-                                ctype=CellType.FAILED)))
-                        else:
-                            encrypted = encryptor.update(
-                                padder128(pickle.dumps(Cell(
-                                    their_cell,
-                                    ctype=CellType.CONNECT_RESP
-                                )))
-                            )
-                            encrypted += encryptor.finalize()
-                            if RELAY_DEBUG:
-                                print("sent valid response")
-                            i.send(pickle.dumps(Cell(
-                                encrypted,
-                                IV=init_vector,
-                                ctype=CellType.FINISHED
-                            )))
-                            sending_client.bounce_ip = cell_to_next.ip_addr
-                            sending_client.bounce_port = cell_to_next.port
-                            sending_client.bounce_socket = sock
-                            print("Connection success.\n\n\n\n\n")
-                    except (ConnectionRefusedError, ConnectionResetError,
-                            ConnectionAbortedError, struct.error,
-                            socket.timeout):
-                        print("failed to connect to other relay. "
-                              + "sending back failure message, or timed out.")
-                        init_vector = os.urandom(16)
-                        cipher = Cipher(
-                            algorithms.AES(derived_key),
-                            modes.CBC(init_vector),
-                            backend=default_backend()
-                        )
-                        encryptor = cipher.encryptor()
-                        encrypted = encryptor.update(
-                            padder128(pickle.dumps(Cell(
-                                pickle.dumps(Cell(
-                                    "CONNECTIONREFUSED",
-                                    ctype=CellType.FAILED
-                                )),
-                                ctype=CellType.FAILED
-                            )))
-                        )
-                        encrypted += encryptor.finalize()
-                        i.send(pickle.dumps(Cell(
-                            encrypted,
-                            IV=init_vector,
-                            ctype=CellType.FAILED
-                        )))
-                        print("sent back failure message.")
 
-                # is an item to be relayed.
+                if cell_to_next.type == CellType.RELAY_CONNECT:
+                    # is a request for a relay connect
+                    self.extend_circuit(cell_to_next, decrypted, sending_client, i)
+
                 elif cell_to_next.type == CellType.RELAY:
-                    if sending_client.bounce_socket is None:  # check if there is bounce socket
+                    # is a cell that is to be relayed.
+                    if sending_client.bounce_socket is None:  # There is no next hop registered to this client.
                         return
                     sock = sending_client.bounce_socket
                     if RELAY_DEBUG:
@@ -321,6 +330,7 @@ class Relay():
                         print("payload")
                         print(cell_to_next.payload)
                         print(cell_to_next.type)
+
                     sock.send(cell_to_next.payload)  # send over the cell
                     while True:
                         try:
@@ -337,7 +347,7 @@ class Relay():
                             # print(their_cell)
                             init_vector = os.urandom(16)
                             cipher = Cipher(
-                                algorithms.AES(derived_key),
+                                algorithms.AES(sending_client.key),
                                 modes.CBC(init_vector),
                                 backend=default_backend()
                             )
@@ -354,14 +364,14 @@ class Relay():
                                 IV=init_vector,
                                 ctype=CellType.CONTINUE
                             )))
-                            print("relayed this packet once.")
+                            print("relayed a packet.")
                         else:
                             print("received the last packet.")
                             # print(len(their_cell))
                             # print(their_cell)
                             init_vector = os.urandom(16)
                             cipher = Cipher(
-                                algorithms.AES(derived_key),
+                                algorithms.AES(sending_client.key),
                                 modes.CBC(init_vector),
                                 backend=default_backend()
                             )
@@ -401,7 +411,7 @@ class Relay():
 
                         init_vector = os.urandom(16)
                         cipher = Cipher(
-                            algorithms.AES(derived_key),
+                            algorithms.AES(sending_client.key),
                             modes.CBC(init_vector),
                             backend=default_backend()
                         )
@@ -454,7 +464,7 @@ class Relay():
                     else:
                         init_vector = os.urandom(16)
                         cipher = Cipher(
-                            algorithms.AES(derived_key),
+                            algorithms.AES(sending_client.key),
                             modes.CBC(init_vector),
                             backend=default_backend()
                         )
