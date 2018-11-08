@@ -18,35 +18,26 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from util import padder128, CLIENT_DEBUG
+from util import padder128, CLIENT_DEBUG, RegisteredRelay
 from cell import Cell, CellType
-from dataclasses import dataclass
 
 
-@dataclass()
-class Relay():
+class Relay:
     """relay data class"""
-    ip_addr: str
-    sock:socket.socket
-    key: bytes
-    ec_key: bytes
-    rsa_key: bytes
-    port: int
+    def __init__(self,given_ip, provided_socket, derived_key, ec_privkey, given_rsa_key, given_port):
+        self.ip_addr = given_ip
+        self.sock = provided_socket
+        self.key = derived_key
+        self.ec_key_ = ec_privkey
+        self.rsa_key = given_rsa_key
+        self.port = given_port
 
 
-@dataclass
-class RegisteredRelay():
-    """Directory Relay information data class"""
-    ip: str
-    port: int
-    key = bytes
 
-
-class Client():
+class Client:
     """Client class"""
 
     def __init__(self):
-        print("re_init")
         self.relay_LIST = []
         # generate RSA public private key pair
         self.private_key = rsa.generate_private_key(
@@ -126,7 +117,7 @@ class Client():
         except InvalidSignature:
             if CLIENT_DEBUG:
                 print("Something went wrong.. Signature was invalid.")
-            return
+            return None
 
     @staticmethod
     def aes_decryptor(secret_key, provided_cell):
@@ -179,7 +170,7 @@ class Client():
                     print("connected successfully to relay @ " + gonnect
                           + "   Port: " + str(gonnectport))
                 self.relay_LIST.append(
-                    Relay(ip_addr=gonnect, sock=sock, key=derived_key, ec_key=ec_privkey, rsa_key=rsa_key, port=gonnectport))
+                    Relay(gonnect, sock, derived_key, ec_privkey, rsa_key, gonnectport))
                 return
 
             else:  # Verification error or Unpacking Error occurred
@@ -230,8 +221,7 @@ class Client():
             derived_key = self.check_signature_and_derive(their_cell, rsa_key, ec_privkey)
 
             self.relay_LIST.append(
-                Relay(ip_addr=gonnect, sock=sock, key=derived_key, ec_key=ec_privkey,
-                      rsa_key=rsa_key, port=gonnectport))
+                Relay(gonnect, sock, derived_key, ec_privkey, rsa_key, gonnectport))
 
             if CLIENT_DEBUG:
                 print("connected successfully to relay @ " + gonnect
@@ -302,8 +292,7 @@ class Client():
             derived_key = self.check_signature_and_derive(their_cell, rsa_key, ec_privkey)
 
             self.relay_LIST.append(
-                Relay(ip_addr=gonnect, sock=sock, key=derived_key, ec_key=ec_privkey,
-                      rsa_key=rsa_key, port=gonnectport))
+                Relay(gonnect, sock, derived_key, ec_privkey, rsa_key, gonnectport))
 
             if CLIENT_DEBUG:
                 print("connected successfully to relay @ " + gonnect
@@ -426,9 +415,9 @@ class Client():
             print("socketerror")
 
     def close(self):  # to close things.
+        """Run at the end of a client call to CLOSE all sockets"""
         for i in self.relay_LIST:
             i.sock.close()
-        pass
 
 
 class Responder(BaseHTTPRequestHandler):

@@ -12,3 +12,11 @@ def padder128(data):
     p1b = padder1b.update(data)
     p1b += padder1b.finalize()
     return p1b
+
+
+class RegisteredRelay:
+    """Relay data class, minus socket."""
+    def __init__(self, ip_addr, portnum, given_key):
+        self.ip = ip_addr
+        self.port = portnum
+        self.key = given_key

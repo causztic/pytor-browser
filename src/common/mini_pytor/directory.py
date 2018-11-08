@@ -1,3 +1,4 @@
+"""Directory Server Class file"""
 import socket
 import time
 import select
@@ -9,25 +10,20 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import serialization
+from util import RegisteredRelay
 from cell import Cell, CellType
-from dataclasses import dataclass
 
-@dataclass
-class Relay():
+
+class Relay:
     """Relay data class"""
-    ip: str
-    port: int
-    key: bytes
-    socket: socket.socket
+    def __init__(self, ip_addr, provided_socket, portnum, given_key):
+        self.ip = ip_addr
+        self.socket = provided_socket
+        self.port = portnum
+        self.key = given_key
 
-@dataclass
-class RegisteredRelay():
-    """Relay data class, minus socket."""
-    ip: str
-    port: int
-    key: bytes
 
-class DirectoryServer():
+class DirectoryServer:
     """Directory server class"""
     def __init__(self):
         self.key = rsa.generate_private_key(
@@ -40,13 +36,8 @@ class DirectoryServer():
             encoding=serialization.Encoding.PEM,
             format=serialization.PublicFormat.SubjectPublicKeyInfo
         )
-
-        self.lasttime = time.time()
         self.registered_relays = []
-        self.identities = []
         self.relay_sockets = []
-        for i in range(100):
-            self.identities.append(i)  # add 1 to 100 for the identities.
         self.connected_relays = []
         # tcp type chosen for first.
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -54,7 +45,6 @@ class DirectoryServer():
         # better be "" or it'll listen only on localhost
         self.socket.bind(("", 50000))
         self.socket.listen(100)
-        self.giving_server = []
 
     def handleconnection(self):
         print("got a connection request.")
@@ -96,10 +86,10 @@ class DirectoryServer():
             ipaddress, _ = relaysocket.getpeername()  # obtain the ip and port of that server.
             print("Added-> PORT: " + str(portnum) + " IP: " + str(ipaddress))
             self.connected_relays.append(
-                Relay(ip=ipaddress, socket=relaysocket,
-                      port=portnum, key=theirpublickey))
+                Relay(ipaddress, relaysocket,
+                      portnum, theirpublickey))
 
-            self.registered_relays.append(RegisteredRelay(ip=ipaddress, port=portnum, key=publickey_bytes))
+            self.registered_relays.append(RegisteredRelay(ipaddress, portnum, publickey_bytes))
             self.relay_sockets.append(relaysocket)
             return
 
@@ -153,6 +143,7 @@ class DirectoryServer():
                     self.handleconnection()
                 else:
                     self.handleclosed(i)
+
 
 Directory = DirectoryServer()
 Directory.mainloop()
