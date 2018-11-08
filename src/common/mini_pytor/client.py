@@ -302,10 +302,10 @@ class Client:
             print("socket error occurred")
 
     @staticmethod
-    def req_wrapper(request,relay_list):
+    def req_wrapper(request, relay_list):
+        """Generate a encrypted cell for sending that contains the request"""
         sending_cell = Cell(request, ctype=CellType.REQ)
         # generate True payload
-
         init_vector, encrypted_cell = Client.aes_encryptor(relay_list[2].key, sending_cell)
         sending_cell = Cell(encrypted_cell, IV=init_vector, ctype=CellType.RELAY)
         sending_cell.ip_addr = relay_list[2].ip_addr
