@@ -28,7 +28,7 @@ const mutations = {
     state.history.push(website);
   },
   setActualURL(state, website) {
-    state.actualURL = `http://localhost:27182?${website}`;
+    state.actualURL = `http://localhost:27182?url=${website}`;
   },
 };
 

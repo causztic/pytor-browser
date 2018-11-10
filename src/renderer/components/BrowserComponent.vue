@@ -31,7 +31,6 @@ export default {
     };
   },
   computed: mapState({
-    // response: state => state.query.response,
     actualURL: state => state.query.actualURL,
     connected: state => state.status.connected,
   }),

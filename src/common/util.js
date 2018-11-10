@@ -18,14 +18,18 @@ const spawnClient = () => {
 
 const spawnServers = () => {
   const directory = spawn('python', ['./mini_pytor/directory.py'], { cwd: __dirname });
-  electron.ipcRenderer.send('pid-msg', directory.pid);
   const instances = [];
-  setTimeout(['a', 'b', 'c'].forEach((instance) => {
-    const serverInstance = spawn('python', ['./mini_pytor/relay.py', instance], { cwd: __dirname });
-    instances.push(serverInstance);
-    electron.ipcRenderer.send('pid-msg', serverInstance.pid);
-  }), 500);
-  const client = spawnClient();
+  let client;
+
+  electron.ipcRenderer.send('pid-msg', directory.pid);
+  setTimeout(() => {
+    ['a', 'b', 'c'].forEach((instance) => {
+      const serverInstance = spawn('python', ['./mini_pytor/relay.py', instance], { cwd: __dirname });
+      instances.push(serverInstance);
+      electron.ipcRenderer.send('pid-msg', serverInstance.pid);
+    });
+    client = spawnClient();
+  }, 1000);
   return { directory, client, servers: instances };
 };
 
