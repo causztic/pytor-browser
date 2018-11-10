@@ -5,7 +5,6 @@ import sys
 import json
 import struct
 import socket
-import select
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import urllib
