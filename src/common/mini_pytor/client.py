@@ -1,44 +1,31 @@
 """Client class file"""
 
 import pickle
-import os
-import json
 import sys
+import json
 import struct
 import socket
+import select
+from http.server import BaseHTTPRequestHandler, HTTPServer
 
-import cryptography.hazmat.primitives.asymmetric.padding
-from cryptography.hazmat.primitives.asymmetric import rsa
-from cryptography.hazmat.primitives.asymmetric import ec
+import urllib
+import requests
+from cryptography.hazmat.primitives.asymmetric import padding, rsa, ec
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives import hashes
 from cryptography.exceptions import InvalidSignature
-from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
-from util import padder128, CLIENT_DEBUG
+import util
 from cell import Cell, CellType
 
 
-class Server():
-    """Server class"""
-
-    def __init__(self, ip, sock, derived_key, EC_key, RSA_key, port):
-        self.ip_addr = ip
-        self.sock = sock
-        self.key = derived_key
-        self.ec_key = EC_key
-        self.rsa_key = RSA_key
-        self.port = port
-
-
-class Client():
+class Client:
     """Client class"""
-    SERVER_LIST = []
 
     def __init__(self):
-
+        self.relay_list = []
         # generate RSA public private key pair
         self.private_key = rsa.generate_private_key(
             backend=default_backend(), public_exponent=65537, key_size=3072)
@@ -50,8 +37,21 @@ class Client():
         )
 
     @staticmethod
-    def make_first_connect_cell():
-        """add method def"""
+    def get_directory_items():
+        """Method to obtain items from directory"""
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        # connect to directory
+        sock.connect((socket.gethostbyname(socket.gethostname()), 50000))
+        sock.send(pickle.dumps(Cell("", ctype=CellType.GET_DIRECT)))
+        received_cell = sock.recv(32768)
+        received_cell = pickle.loads(received_cell)
+        if isinstance(received_cell.payload, list):
+            print(received_cell.payload)
+        return received_cell.payload
+
+    @staticmethod
+    def make_first_connect_cell(rsa_public_key):
+        """Create the cell that is used to initiate a connection with any relay."""
         ec_privkey = ec.generate_private_key(
             ec.SECP384R1(), default_backend())  # elliptic curve
         dh_pubkey_bytes = ec_privkey.public_key().public_bytes(
@@ -60,461 +60,427 @@ class Client():
         )
         # send the initialising cell, by sending the DHpublicKeyBytes
         sending_cell = Cell(dh_pubkey_bytes, ctype=CellType.ADD_CON)
-        return sending_cell, ec_privkey
-
-    def first_connect(self, gonnect, gonnectport, rsa_key_public):
-        """you should already HAVE their public key."""
-        try:
-            # TCP connection
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.connect((gonnect, gonnectport))
-            sending_cell, ec_privkey = Client.make_first_connect_cell()
-            # key encryption for RSA HERE USING SOME PUBLIC KEY
-            readied_cell = pickle.dumps(sending_cell)
-            if CLIENT_DEBUG:
-                print("first connect Actual cell (encrypted bytes) ")
-                print(readied_cell)
-            encrypted_cell = rsa_key_public.encrypt(
-                readied_cell,
-                cryptography.hazmat.primitives.asymmetric.padding.OAEP(
-                    mgf=cryptography.hazmat.primitives.asymmetric.padding.MGF1(
-                        algorithm=hashes.SHA256()),
-                    algorithm=hashes.SHA256(),
-                    label=None
-                )
-            )
-            if CLIENT_DEBUG:
-                print("first connect Actual cell(decrypted bytes)")
-                print(encrypted_cell)
-            sock.send(encrypted_cell)  # send my public key... tcp style
-            their_cell = sock.recv(4096)
-            their_cell = pickle.loads(their_cell)  # load up their cell
-            if CLIENT_DEBUG:
-                print(their_cell.type)
-
-            # this cell isn't encrypted. Extract the signature to verify
-            signature = their_cell.signature
-            try:
-                rsa_key_public.verify(
-                    signature,
-                    their_cell.salt,
-                    cryptography.hazmat.primitives.asymmetric.padding.PSS(
-                        mgf=cryptography.hazmat.primitives.asymmetric.padding.MGF1(
-                            algorithm=hashes.SHA256()),
-                        salt_length=cryptography.hazmat.primitives
-                        .asymmetric.padding.PSS.MAX_LENGTH
-                    ),
-                    hashes.SHA256()
-                )
-                # verify that the cell was signed using their key.
-                # load up their key.
-                their_key = serialization.load_pem_public_key(
-                    their_cell.payload, backend=default_backend())
-
-                shared_key = ec_privkey.exchange(ec.ECDH(), their_key)
-                derived_key = HKDF(
-                    algorithm=hashes.SHA256(),
-                    length=32,
-                    salt=their_cell.salt,
-                    info=None,
-                    backend=default_backend()
-                ).derive(shared_key)
-                # cipher = Cipher(algorithms.AES(derived_key), modes.CBC(IV),
-                # backend=default_backend()) #256 bit length cipher lel
-                # encryptor = cipher.encryptor()
-                # ct = encryptor.update() + encryptor.finalize()
-                # decryptor = cipher.decryptor()
-                # decryptor.update(ct) + decryptor.finalize()
-
-                # Connection is established at this point.
-                if CLIENT_DEBUG:
-                    print("connected successfully to server @ " + gonnect
-                          + "   Port: " + str(gonnectport))
-                self.SERVER_LIST.append(
-                    Server(gonnect, sock, derived_key,
-                           ec_privkey, rsa_key_public, gonnectport))
-                return   # a server item is created.
-            except InvalidSignature:
-                if CLIENT_DEBUG:
-                    print("Something went wrong.. Signature was invalid.")
-                return None
-        except (struct.error, ConnectionResetError, ConnectionRefusedError):
-            print("disconnected or server is not online/ connection was refused.")
-
-    def more_connect_1(self, gonnect, gonnectport, intermediate_servers, rsa_key):
-        """must send IV and a cell that is encrypted with the next public key
-        public key list will have to be accessed in order with list of servers.
-        number between is to know when to stop i guess."""
-
-        sending_cell, ec_privkey = Client.make_first_connect_cell()
-        sending_cell = pickle.dumps(sending_cell)
-        if CLIENT_DEBUG:
-            print("Innermost cell with keys")
-            print(sending_cell)
-        sending_cell = rsa_key.encrypt(
-            sending_cell,
-            cryptography.hazmat.primitives.asymmetric.padding.OAEP(
-                mgf=cryptography.hazmat.primitives.asymmetric.padding.MGF1(
-                    algorithm=hashes.SHA256()),
+        readied_cell = pickle.dumps(sending_cell)
+        if util.CLIENT_DEBUG:
+            print("First connect actual cell (encrypted bytes) ")
+            print(readied_cell)
+        encrypted_cell = rsa_public_key.encrypt(
+            readied_cell,
+            padding.OAEP(
+                mgf=padding.MGF1(algorithm=hashes.SHA256()),
                 algorithm=hashes.SHA256(),
                 label=None
             )
         )
-        if CLIENT_DEBUG:
-            print("Innermost cell with keys (Encrypted)")
-            print(sending_cell)
-        # connection type. exit node always knows
-        sending_cell = Cell(sending_cell, ctype=CellType.RELAY_CONNECT)
-        sending_cell.ip_addr = gonnect
-        # save the stuff i should be sending over.
-        sending_cell.port = gonnectport
-        init_vector = os.urandom(16)
+        # return my generated ecdhe key and the encrypted cell
+        return encrypted_cell, ec_privkey
 
-        cipher = Cipher(
-            algorithms.AES(intermediate_servers[0].key),
-            modes.CBC(init_vector),
-            backend=default_backend()
-        )  # 256 bit length cipher lel
-        encryptor = cipher.encryptor()  # encrypt the entire cell
-        encrypted = encryptor.update(padder128(pickle.dumps(sending_cell)))
-        encrypted += encryptor.finalize()  # finalise encryption.
-        sending_cell = Cell(encrypted, IV=init_vector,
+    @staticmethod
+    def check_signature_and_derive(provided_cell, rsa_key, private_ecdhe):
+        """given a cell, attempt to verify payload. Afterwards, derive shared key."""
+        signature = provided_cell.signature
+        try:
+            # verify that the cell was signed using their key.
+            util.rsa_verify(rsa_key, signature, provided_cell.salt)
+            # load up their half of the ecdhe key
+            their_ecdhe_key = serialization.load_pem_public_key(
+                provided_cell.payload, backend=default_backend())
+            shared_key = private_ecdhe.exchange(ec.ECDH(), their_ecdhe_key)
+            derived_key = HKDF(
+                algorithm=hashes.SHA256(),
+                length=32,
+                salt=provided_cell.salt,
+                info=None,
+                backend=default_backend()
+            ).derive(shared_key)
+
+            # derived key is returned
+            return derived_key
+
+        except InvalidSignature:
+            if util.CLIENT_DEBUG:
+                print("Something went wrong.. Signature was invalid.",
+                      file=sys.stderr)
+            return None
+
+    def first_connect(self, gonnect, gonnectport, rsa_key):
+        """Connect to the first relay of the trio"""
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.connect((gonnect, gonnectport))
+            encrypted_cell, ec_privkey = Client.make_first_connect_cell(
+                rsa_key)
+            if util.CLIENT_DEBUG:
+                print("First connect actual cell (decrypted bytes)")
+                print(encrypted_cell)
+            sock.send(encrypted_cell)  # Send them my generated ecdhe key.
+            their_cell = sock.recv(4096)  # await a response.
+            their_cell = pickle.loads(their_cell)
+            derived_key = self.check_signature_and_derive(
+                their_cell,
+                rsa_key,
+                ec_privkey)
+            # attempt to check the signature and derive their key.
+
+            if derived_key:  # ie did not return None.
+                if util.CLIENT_DEBUG:
+                    print("Connected successfully to relay @ " + gonnect
+                          + "   Port: " + str(gonnectport))
+                self.relay_list.append(
+                    RelayData(gonnect, sock, derived_key, ec_privkey, rsa_key, gonnectport))
+            else:  # Verification error or Unpacking Error occurred
+                print("Verification of signature failed/Invalid cell was received.")
+        except (struct.error, ConnectionResetError, ConnectionRefusedError):
+            print("Disconnected or relay is not online/ connection was "
+                  + "refused.", file=sys.stderr)
+
+    def more_connect_1(self, gonnect, gonnectport, rsa_key):
+        """Connect to the next relay through the first one."""
+        encrypted_cell, ec_privkey = Client.make_first_connect_cell(rsa_key)
+        if util.CLIENT_DEBUG:
+            print("Innermost cell with keys (encrypted)")
+            print(encrypted_cell)
+
+        intermediate_relays = self.relay_list
+        sending_cell = Cell(encrypted_cell, ctype=CellType.RELAY_CONNECT)
+        sending_cell.ip_addr = gonnect
+        sending_cell.port = gonnectport
+        # inform of next port of call.
+        encrypted_cell, init_vector = util.aes_encryptor(
+            intermediate_relays[0].key,
+            sending_cell
+        )
+        sending_cell = Cell(encrypted_cell, IV=init_vector,
                             ctype=CellType.RELAY_CONNECT)
+        # wrap in another cell to save init_vector
 
         try:
-            sock = intermediate_servers[0].sock
+            sock = intermediate_relays[0].sock
             sock.send(pickle.dumps(sending_cell))  # send over the cell
-            if CLIENT_DEBUG:
-                print("cell sent: ")
+            if util.CLIENT_DEBUG:
+                print("Cell sent: ")
                 print(pickle.dumps(sending_cell))
             their_cell = sock.recv(4096)  # await answer
             # you now receive a cell with encrypted payload.
-            counter = len(intermediate_servers) - 1
             their_cell = pickle.loads(their_cell)
-            while counter >= 0:
-                cipher = Cipher(
-                    algorithms.AES(intermediate_servers[counter].key),
-                    modes.CBC(their_cell.init_vector),
-                    backend=default_backend()
-                )
-                decryptor = cipher.decryptor()
-                decrypted = decryptor.update(their_cell.payload)
-                decrypted += decryptor.finalize()  # finalise decryption
-                if CLIENT_DEBUG:
-                    print(decrypted)
-                their_cell = pickle.loads(decrypted)
-                counter -= 1
-                if CLIENT_DEBUG:
-                    print(their_cell.payload)
-                their_cell = pickle.loads(their_cell.payload)
+            decrypted = util.aes_decryptor(
+                intermediate_relays[0].key, their_cell)
+            if util.CLIENT_DEBUG:
+                print(decrypted)
+            their_cell = pickle.loads(decrypted)
+            if util.CLIENT_DEBUG:
+                print(their_cell.payload)
+            their_cell = pickle.loads(their_cell.payload)
+
             if their_cell.type == CellType.FAILED:
-                if CLIENT_DEBUG:
-                    print("FAILED AT CONNECTION!")
+                if util.CLIENT_DEBUG:
+                    print("FAILED AT CONNECTION!", file=sys.stderr)
                 if their_cell.payload == "CONNECTIONREFUSED":
-                    print("Connection was refused. Is the server online yet?")
+                    print("Connection was refused. Is the relay online yet?")
                 return
-            # their_cell = pickle.loads(their_cell.payload)
 
-            # this cell isn't encrypted. Extract the signature to verify
-            signature = their_cell.signature
-            their_cell.signature = None
-            rsa_key.verify(
-                signature,
-                their_cell.salt,
-                cryptography.hazmat.primitives.asymmetric.padding.PSS(
-                    mgf=cryptography.hazmat.primitives.asymmetric.padding.MGF1(
-                        algorithm=hashes.SHA256()),
-                    salt_length=cryptography.hazmat.primitives
-                    .asymmetric.padding.PSS.MAX_LENGTH
-                ),
-                hashes.SHA256()
-            )
-            # Verify that the cell was signed using their key.
-            # At this point, you have the cell that is the public key of your target server.
-            # Additionally, salt too..
+            derived_key = self.check_signature_and_derive(
+                their_cell, rsa_key, ec_privkey)
 
-            # Load up their key.
-            their_key = serialization.load_pem_public_key(
-                their_cell.payload, backend=default_backend())
-            shared_key = ec_privkey.exchange(ec.ECDH(), their_key)
-            derived_key = HKDF(
-                algorithm=hashes.SHA256(),
-                length=32,
-                salt=their_cell.salt,
-                info=None,
-                backend=default_backend()
-            ).derive(shared_key)
-            self.SERVER_LIST.append(
-                Server(gonnect, sock, derived_key, ec_privkey, rsa_key, gonnectport))
-            if CLIENT_DEBUG:
-                print("connected successfully to server @ " + gonnect
-                      + "   Port: " + str(gonnectport))
+            self.relay_list.append(
+                RelayData(gonnect, sock, derived_key, ec_privkey, rsa_key, gonnectport))
+
+            if util.CLIENT_DEBUG:
+                print("Connected successfully to relay @ " + gonnect
+                      + "   Port: " + str(gonnectport), file=sys.stderr)
+
         except (ConnectionResetError, ConnectionRefusedError, struct.error):
-            if CLIENT_DEBUG:
-                print("Socket Error, removing from the list.")
-            del self.SERVER_LIST[0]  # remove it from the lsit
-            if CLIENT_DEBUG:
-                print("REMOVED SERVER 0 DUE TO FAILED CONNECTION")
+            if util.CLIENT_DEBUG:
+                print("Socket Error, removing from the list.", file=sys.stderr)
+            del self.relay_list[0]  # remove it from the lsit
+            if util.CLIENT_DEBUG:
+                print("REMOVED relay 0 DUE TO FAILED CONNECTION")
 
-    def more_connect_2(self, gonnect, gonnectport, intermediate_servers, rsa_key):
-        """must send IV and a cell that is encrypted with the next public key
-        public key list will have to be accessed in order with list of servers.
-        number between is to know when to stop i guess."""
+    def more_connect_2(self, gonnect, gonnectport, rsa_key):
+        """Connect to the next relay through my 2 connected relays."""
+        encrypted_cell, ec_privkey = Client.make_first_connect_cell(rsa_key)
+        if util.CLIENT_DEBUG:
+            print("Innermost cell with keys (encrypted)", file=sys.stderr)
+            print(encrypted_cell)
 
-        sending_cell, ec_privkey = Client.make_first_connect_cell()
-        sending_cell = pickle.dumps(sending_cell)
-        if CLIENT_DEBUG:
-            print("Innermost cell with keys")
-            print(sending_cell)
-        sending_cell = rsa_key.encrypt(
-            sending_cell,
-            cryptography.hazmat.primitives.asymmetric.padding.OAEP(
-                mgf=cryptography.hazmat.primitives.asymmetric.padding.MGF1(
-                    algorithm=hashes.SHA256()
-                ),
-                algorithm=hashes.SHA256(),
-                label=None
-            )
-        )
-        if CLIENT_DEBUG:
-            print("Innermost cell with keys (Encrypted)")
-            print(sending_cell)
+        intermediate_relays = self.relay_list
         # connection type. exit node always knows
-        sending_cell = Cell(sending_cell, ctype=CellType.RELAY_CONNECT)
+        sending_cell = Cell(encrypted_cell, ctype=CellType.RELAY_CONNECT)
+        # Deepest layer, encrypted with RSA
         sending_cell.ip_addr = gonnect
-        # save the stuff i should be sending over.
         sending_cell.port = gonnectport
-        init_vector = os.urandom(16)
-        cipher = Cipher(
-            algorithms.AES(intermediate_servers[1].key),
-            modes.CBC(init_vector),
-            backend=default_backend()
-        )  # 256 bit length cipher lel
-        encryptor = cipher.encryptor()  # encrypt the entire cell
-        encrypted = encryptor.update(padder128(pickle.dumps(sending_cell)))
-        encrypted += encryptor.finalize()  # finalise encryption.
-        sending_cell = Cell(encrypted, IV=init_vector,
+        # inform of next port of call.
+        encrypted_cell, init_vector = util.aes_encryptor(
+            intermediate_relays[1].key,
+            sending_cell
+        )
+        # encrypt using said keys.
+        sending_cell = Cell(encrypted_cell, IV=init_vector,
                             ctype=CellType.RELAY_CONNECT)
-        sending_cell.ip_addr = intermediate_servers[1].ip_addr
-        sending_cell.port = intermediate_servers[1].port
-        sending_cell = Cell(pickle.dumps(sending_cell), ctype=CellType.RELAY)
-        init_vector = os.urandom(16)
+        # 2nd Layer from top
 
-        cipher = Cipher(
-            algorithms.AES(intermediate_servers[0].key),
-            modes.CBC(init_vector),
-            backend=default_backend()
-        )  # 256 bit length cipher lel
-        encryptor = cipher.encryptor()  # encrypt the entire cell
-        encrypted = encryptor.update(padder128(pickle.dumps(sending_cell)))
-        encrypted += encryptor.finalize()  # finalise encryption.
-        sending_cell = Cell(encrypted, IV=init_vector, ctype=CellType.RELAY)
-        sending_cell.ip_addr = intermediate_servers[0].ip_addr
-        sending_cell.port = intermediate_servers[0].port
+        sending_cell.ip_addr = intermediate_relays[1].ip_addr
+        sending_cell.port = intermediate_relays[1].port
+        # inform of next port of call again.
+        sending_cell = Cell(pickle.dumps(sending_cell), ctype=CellType.RELAY)
+
+        encrypted_cell, init_vector = util.aes_encryptor(
+            intermediate_relays[0].key,
+            sending_cell
+        )
+        sending_cell = Cell(encrypted_cell, IV=init_vector,
+                            ctype=CellType.RELAY)  # Outermost layer
+        sending_cell.ip_addr = intermediate_relays[0].ip_addr
+        sending_cell.port = intermediate_relays[0].port
+        # inform of next port of call one more time
+
         try:
-            sock = intermediate_servers[0].sock
+            sock = intermediate_relays[0].sock
             sock.send(pickle.dumps(sending_cell))  # send over the cell
             their_cell = sock.recv(4096)  # await answer
             # you now receive a cell with encrypted payload.
-            if CLIENT_DEBUG:
+            if util.CLIENT_DEBUG:
                 print(their_cell)
             their_cell = pickle.loads(their_cell)
-            if CLIENT_DEBUG:
+            if util.CLIENT_DEBUG:
                 print(their_cell.payload)
             counter = 0
-            while counter < len(intermediate_servers):
-                cipher = Cipher(
-                    algorithms.AES(intermediate_servers[counter].key),
-                    modes.CBC(their_cell.init_vector),
-                    backend=default_backend()
-                )
-                decryptor = cipher.decryptor()
-                decrypted = decryptor.update(their_cell.payload)
-                decrypted += decryptor.finalize()  # finalise decryption
-                if CLIENT_DEBUG:
+            while counter < len(intermediate_relays):
+                # print(their_cell.payload)
+                decrypted = util.aes_decryptor(
+                    intermediate_relays[counter].key, their_cell)
+                if util.CLIENT_DEBUG:
                     print(decrypted)
                 their_cell = pickle.loads(decrypted)
+                # print(their_cell.payload)
                 counter += 1
-                their_cell = pickle.loads(their_cell.payload)
+                if counter < len(intermediate_relays):
+                    their_cell = their_cell.payload
+
             if their_cell.type == CellType.FAILED:
-                if CLIENT_DEBUG:
-                    print("FAILED AT CONNECTION!")
+                if util.CLIENT_DEBUG:
+                    print("FAILED AT CONNECTION!", file=sys.stderr)
                 return
-            # their_cell = pickle.loads(their_cell.payload)
 
-            # this cell isn't encrypted. Extract the signature to verify
-            signature = their_cell.signature
-            their_cell.signature = None
-            rsa_key.verify(
-                signature,
-                their_cell.salt,
-                cryptography.hazmat.primitives.asymmetric.padding.PSS(
-                    mgf=cryptography.hazmat.primitives.asymmetric.padding.MGF1(
-                        algorithm=hashes.SHA256()),
-                    salt_length=cryptography.hazmat.primitives.asymmetric.padding.PSS.MAX_LENGTH
-                ),
-                hashes.SHA256()
-            )
-            # Verify that the cell was signed using their key.
-            # At this point, you have the cell that is the public key of your target server.
-            # Additionally, salt too...
+            their_cell = pickle.loads(their_cell.payload)
+            derived_key = self.check_signature_and_derive(
+                their_cell, rsa_key, ec_privkey)
 
-            # Load up their key
-            their_key = serialization.load_pem_public_key(
-                their_cell.payload, backend=default_backend())
-            shared_key = ec_privkey.exchange(ec.ECDH(), their_key)
-            derived_key = HKDF(
-                algorithm=hashes.SHA256(),
-                length=32,
-                salt=their_cell.salt,
-                info=None,
-                backend=default_backend()
-            ).derive(shared_key)
-            self.SERVER_LIST.append(
-                Server(gonnect, sock, derived_key, ec_privkey, rsa_key, gonnectport))
-            if CLIENT_DEBUG:
-                print("connected successfully to server @ " + gonnect
-                      + "   Port: " + str(gonnectport))
+            self.relay_list.append(
+                RelayData(gonnect, sock, derived_key, ec_privkey, rsa_key, gonnectport))
+
+            if util.CLIENT_DEBUG:
+                print("Connected successfully to relay @ " + gonnect
+                      + "   Port: " + str(gonnectport), file=sys.stderr)
         except struct.error:
-            print("socket error occurred")
+            print("Socket error occurred", file=sys.stderr)
 
-    def req(self, request, intermediate_servers):
+    @staticmethod
+    def req_wrapper(request, relay_list):
+        """Generate a encrypted cell for sending that contains the request"""
+        sending_cell = Cell(request, ctype=CellType.REQ)
+        # generate True payload
+        encrypted_cell, init_vector = util.aes_encryptor(
+            relay_list[2].key, sending_cell)
+        sending_cell = Cell(encrypted_cell, IV=init_vector,
+                            ctype=CellType.RELAY)
+        sending_cell.ip_addr = relay_list[2].ip_addr
+        sending_cell.port = relay_list[2].port
+        sending_cell = Cell(pickle.dumps(sending_cell), ctype=CellType.RELAY)
+
+        encrypted_cell, init_vector = util.aes_encryptor(
+            relay_list[1].key, sending_cell)
+        sending_cell = Cell(encrypted_cell, IV=init_vector,
+                            ctype=CellType.RELAY)
+        sending_cell.ip_addr = relay_list[1].ip_addr
+        sending_cell.port = relay_list[1].port
+        sending_cell = Cell(pickle.dumps(sending_cell), ctype=CellType.RELAY)
+
+        encrypted_cell, init_vector = util.aes_encryptor(
+            relay_list[0].key, sending_cell)
+        sending_cell = Cell(encrypted_cell, IV=init_vector,
+                            ctype=CellType.RELAY)
+        sending_cell.ip_addr = relay_list[0].ip_addr
+        sending_cell.port = relay_list[0].port
+        return sending_cell
+
+    @staticmethod
+    def chain_decryptor(list_of_intermediate_relays, provided_cell):
+        """Decrypt something given a list the intermediate relay list
+        and the cell"""
+        counter = 0
+        while counter < len(list_of_intermediate_relays):
+            decrypted = util.aes_decryptor(
+                list_of_intermediate_relays[counter].key,
+                provided_cell
+            )
+            provided_cell = pickle.loads(decrypted)
+            counter += 1
+            if counter < len(list_of_intermediate_relays):
+                provided_cell = provided_cell.payload
+
+        return provided_cell
+
+    def req(self, request):
         """send out stuff in router."""
-        if CLIENT_DEBUG:
+        if util.CLIENT_DEBUG:
             print("REQUEST SENDING TEST")
         # must send IV and a cell that is encrypted with the next public key
-        # public key list will have to be accessed in order with list of servers
-        # number between is to know when to stop i guess.
+        # public key list will have to be accessed in order with list of relays
         # connection type. exit node always knows
-        sending_cell = Cell(request, ctype=CellType.REQ)
-        init_vector = os.urandom(16)
-        cipher = Cipher(
-            algorithms.AES(intermediate_servers[2].key),
-            modes.CBC(init_vector),
-            backend=default_backend()
-        )  # 256 bit length cipher lel
-        encryptor = cipher.encryptor()  # encrypt the entire cell
-        encrypted = encryptor.update(padder128(pickle.dumps(sending_cell)))
-        encrypted += encryptor.finalize()  # finalise encryption.
-        sending_cell = Cell(encrypted, IV=init_vector, ctype=CellType.RELAY)
-        sending_cell.ip_addr = intermediate_servers[2].ip_addr
-        sending_cell.port = intermediate_servers[2].port
-        sending_cell = Cell(pickle.dumps(sending_cell), ctype=CellType.RELAY)
-
-        init_vector = os.urandom(16)
-        cipher = Cipher(algorithms.AES(intermediate_servers[1].key), modes.CBC(init_vector),
-                        backend=default_backend())  # 256 bit length cipher lel
-        encryptor = cipher.encryptor()  # encrypt the entire cell
-        encrypted = encryptor.update(padder128(pickle.dumps(sending_cell)))
-        encrypted += encryptor.finalize()  # finalise encryption.
-        sending_cell = Cell(encrypted, IV=init_vector, ctype=CellType.RELAY)
-        sending_cell.ip_addr = intermediate_servers[1].ip_addr
-        sending_cell.port = intermediate_servers[1].port
-        sending_cell = Cell(pickle.dumps(sending_cell), ctype=CellType.RELAY)
-        init_vector = os.urandom(16)
-
-        cipher = Cipher(algorithms.AES(intermediate_servers[0].key), modes.CBC(init_vector),
-                        backend=default_backend())  # 256 bit length cipher lel
-        encryptor = cipher.encryptor()  # encrypt the entire cell
-        encrypted = encryptor.update(padder128(pickle.dumps(sending_cell)))
-        encrypted += encryptor.finalize()  # finalise encryption
-        sending_cell = Cell(encrypted, IV=init_vector, ctype=CellType.RELAY)
-        sending_cell.ip_addr = intermediate_servers[0].ip_addr
-        sending_cell.port = intermediate_servers[0].port
+        intermediate_relays = self.relay_list
+        sending_cell = Client.req_wrapper(request, intermediate_relays)
         try:
-            sock = intermediate_servers[0].sock
-            sock.send(pickle.dumps(sending_cell))  # send over the cell
-            their_cell = sock.recv(32768)  # await answer
-            # you now receive a cell with encrypted payload.
-            if CLIENT_DEBUG:
+            sock = intermediate_relays[0].sock
+            sock.send(pickle.dumps(sending_cell))
+            recv_cell = sock.recv(8192)
+            their_cell = pickle.loads(recv_cell)
+            if util.CLIENT_DEBUG:
                 print("received cell")
-                print(len(their_cell))
-                print(their_cell)
-            their_cell = pickle.loads(their_cell)
-            if CLIENT_DEBUG:
+                print(len(recv_cell))
+                print(recv_cell)
                 print("received cell payload")
                 print(their_cell.payload)
-            counter = 0
-            while counter < len(intermediate_servers):
-                cipher = Cipher(
-                    algorithms.AES(intermediate_servers[counter].key),
-                    modes.CBC(their_cell.init_vector),
-                    backend=default_backend()
-                )
-                decryptor = cipher.decryptor()
-                decrypted = decryptor.update(their_cell.payload)
-                decrypted += decryptor.finalize()  # finalise decryption
-                their_cell = pickle.loads(decrypted)
-                counter += 1
-                if counter < len(intermediate_servers):
-                    their_cell = pickle.loads(their_cell.payload)
-
+            their_cell = Client.chain_decryptor(
+                intermediate_relays, their_cell)
             if their_cell.type == CellType.FAILED:
-                if CLIENT_DEBUG:
-                    print("FAILED AT CONNECTION!")
-                return
+                print("FAILED AT CONNECTION!", file=sys.stderr)
+                return Client.failure()  # return failure
 
-            response = pickle.loads(their_cell.payload)
-            if not isinstance(response, type("")):
-                # TODO - find a better solution than replacing \n
-                return_dict = response.content.decode(response.encoding).replace("\n", "")
-                sys.stdout.write(return_dict)
-            else:
-                # TODO - the error code should be specific to our implementation, not generic ones
-                # e.g. node offline, decryption failure etc etc
-                print(json.dumps({"content": "", "status": 404}))
+            if their_cell.type == CellType.CONTINUE:
+                if util.CLIENT_DEBUG:
+                    print("Information is being Streamed. ", file=sys.stderr)
+                summation = [their_cell.payload]
+                while their_cell.type == CellType.CONTINUE:
+                    recv_cell = sock.recv(8192)  # await answer
+                    # you now receive a cell with encrypted payload.
+                    their_cell = pickle.loads(recv_cell)
+                    if util.CLIENT_DEBUG:
+                        print("received PART", file=sys.stderr)
+                        print(len(recv_cell), file=sys.stderr)
+                        print(recv_cell, file=sys.stderr)
+                        print("received cell payload", file=sys.stderr)
+                        print(their_cell.payload, file=sys.stderr)
+                    their_cell = Client.chain_decryptor(
+                        intermediate_relays, their_cell)
+                    summation.append(their_cell.payload)
+                resp = bytes(b"".join(summation))  # take the sum of all your bytes
+                resp = pickle.loads(resp)  # load the FINAL item.
+                return Client._check_response(resp)
+
+            resp = pickle.loads(their_cell.payload)
+            return Client._check_response(resp)
         except struct.error:
-            print("socketerror")
+            print("socketerror", file=sys.stderr)
+
+    @staticmethod
+    def _check_response(response):
+        if isinstance(response, requests.models.Response):
+            # check if it's a response type item.
+            # This check is unnecessary based off code though...
+            # Left in in case of attack
+            if util.CLIENT_DEBUG:
+                print(response.content, file=sys.stderr)
+                print(response.status_code, file=sys.stderr)
+            return_dict = {
+                "content": response.content.decode(response.encoding),
+                "status code": response.status_code
+            }
+            print(json.dumps(return_dict))
+            return response
+        # Reaching this branch implies data corruption of some form
+        return Client.failure()
+
+    def close(self):  # to close things.
+        """Run at the end of a client call to CLOSE all sockets"""
+        for i in self.relay_list:
+            i.sock.close()
+
+    @staticmethod
+    def failure():
+        """Default Error message."""
+        print("Some form of data corruption occurred, "
+              + "or no reply was obtained.", file=sys.stderr)
+        return json.dumps({"content": "", "status": 404})
+
+
+class Responder(BaseHTTPRequestHandler):
+    """Mini HTTP server"""
+
+    def do_GET(self):
+        """Get request response method"""
+        my_client = Client()
+        # Get references from directories.
+        relay_list = Client.get_directory_items()
+        NUM_RELAYS = 3
+        options = {
+            0: my_client.first_connect,
+            1: my_client.more_connect_1,
+            2: my_client.more_connect_2
+        }
+
+        for i in range(NUM_RELAYS):
+            relay = relay_list[i]
+            pubkey = serialization.load_pem_public_key(
+                relay["key"], backend=default_backend())
+            connect_func = options[i]
+            connect_func(relay["ip_addr"], relay["port"], pubkey)
+            print(my_client.relay_list)
+
+        if self.path == "/favicon.ico":
+            return
+        path = Responder._handle_url(self.path)
+        print(path)
+        obtained_response = my_client.req(path)
+        if isinstance(obtained_response, str):
+            print("Producing invalid reply")
+            self.send_response(404)
+            answer = obtained_response.encode()
+            my_client.close()
+        else:
+            print("Producing valid reply")
+            self.send_response(obtained_response.status_code)
+            my_client.close()
+            answer = bytes(obtained_response.content)
+        self.send_header('Content-type', 'text/html')
+        self.end_headers()
+        self.wfile.write(answer)
+
+    @staticmethod
+    def _handle_url(url_path):
+        fallback = "http://www.motherfuckingwebsite.com"
+        query = urllib.parse.parse_qs(url_path[2:])
+        if not query:
+            index1 = url_path.find("http://")
+            index2 = url_path.find("https://")
+            if index1 != -1:
+                return url_path[index1:]
+            if index2 != -1:
+                return url_path[index2:]
+            return fallback
+        if "req" in query:
+            return query["req"][0]
+        return fallback
+
+class RelayData:
+    """Relay data class"""
+
+    def __init__(self, given_ip, provided_socket, derived_key, ec_privkey,
+                 given_rsa_key, given_port):
+
+        self.ip_addr = given_ip
+        self.sock = provided_socket
+        self.key = derived_key
+        self.ec_key_ = ec_privkey
+        self.rsa_key = given_rsa_key
+        self.port = given_port
 
 
 def main():
     """Main function"""
-    my_client = Client()
-    given_args = sys.argv
-
-    if len(given_args) == 11:
-        # TODO - refactor and use argument parsers.
-        # See https://docs.python.org/3/library/argparse.html
-        for i, _ in enumerate(given_args):
-            if given_args[i] == "localhost":
-                given_args[i] = "127.0.0.1"
-
-        given_args[2] = int(given_args[2])
-        given_args[5] = int(given_args[5])
-        given_args[8] = int(given_args[8])
-
-        pem_prefix = "./mini_pytor/publics/publictest"
-
-        # set up static chain.
-        # TODO - get the client to query a directory for the server keys instead of manually getting
-        temp_open = open(pem_prefix + given_args[3] + ".pem", "rb")
-        public_key = serialization.load_pem_public_key(
-            temp_open.read(), backend=default_backend())
-        temp_open.close()
-        my_client.first_connect(given_args[1], given_args[2], public_key)
-
-        temp_open = open(pem_prefix + given_args[6] + ".pem", "rb")
-        public_key = serialization.load_pem_public_key(
-            temp_open.read(), backend=default_backend())
-        temp_open.close()
-        my_client.more_connect_1(given_args[4], given_args[5],
-                                 my_client.SERVER_LIST, public_key)
-
-        temp_open = open(pem_prefix + given_args[9] + ".pem", "rb")
-        public_key = serialization.load_pem_public_key(
-            temp_open.read(), backend=default_backend())
-        temp_open.close()
-        my_client.more_connect_2(given_args[7], given_args[8],
-                                 my_client.SERVER_LIST, public_key)
-
-        my_client.req(given_args[10], my_client.SERVER_LIST)
-    else:
-        print("insufficient arguments\n"
-              + "<Server 1 IP> <Server 1 Port> <key 1 number> "
-              + "<Server 2 IP> <Server 2 Port> <key 2 number> "
-              + "<Server 3 IP> <Server 3 Port> <key 3 number> <Website>\n"
-              + "if localhost is IP, just leave it as localhost")
-
+    server_address = ('', 27182)
+    httpd = HTTPServer(server_address, Responder)
+    httpd.serve_forever()
 
 if __name__ == "__main__":
     main()

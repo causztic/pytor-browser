@@ -12,7 +12,8 @@ class CellType(Enum):
     RELAY = 5
     GIVE_DIRECT = 6
     GET_DIRECT = 7
-    CHECKUP = 8
+    CONTINUE = 8
+    FINISHED = 9
 
 
 class Cell():
@@ -24,6 +25,6 @@ class Cell():
         self.init_vector = IV  # save the IV since it's a connection cell.
         self.salt = salt
         if ctype is None:
-            raise Exception("SHIT GONE WRONG!")
+            raise Exception("SHIT GONE WRONG!")  # that is very true.
         elif isinstance(ctype, CellType):
             self.type = ctype
