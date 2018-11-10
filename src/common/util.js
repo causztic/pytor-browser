@@ -30,6 +30,14 @@ const spawnClient = (website) => {
   return clientInstance;
 };
 
+// convert milliseconds to seconds in string
+const seconds = (milliseconds) => {
+  if (milliseconds === 1000) {
+    return '1 second';
+  }
+  return `${milliseconds / 1000} seconds`;
+}
+
 export {
-  isDevelopment, staticPath, spawnServers, spawnClient,
+  isDevelopment, staticPath, spawnServers, spawnClient, seconds,
 };

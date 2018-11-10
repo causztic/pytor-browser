@@ -482,6 +482,5 @@ def main():
     httpd = HTTPServer(server_address, Responder)
     httpd.serve_forever()
 
-
 if __name__ == "__main__":
     main()

@@ -42,7 +42,7 @@ export default {
     },
   },
   created() {
-    Promise.resolve(this.$store.dispatch('status/startServers'));
+    this.$store.dispatch('status/startServers');
   },
 };
 </script>

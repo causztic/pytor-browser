@@ -8,8 +8,13 @@
     position: absolute;
     right: 0;
     bottom: 0;
+    display: flex;
+    min-width: 150px;
+    align-items: center;
+    justify-content: flex-end;
   }
   #status {
+    margin-left: 5px;
     width: 10px;
     height: 10px;
     display: inline-block;
@@ -51,7 +56,7 @@
 import { mapState } from 'vuex';
 
 export default {
-  name: 'loading-component',
+  name: 'StatusComponent',
   computed: mapState({
     connectionState: state => state.status.connectionState,
     message: state => state.status.message,

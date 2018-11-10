@@ -1,4 +1,6 @@
 <style lang="scss">
+  @import '~@fortawesome/fontawesome-free/css/all.css';
+
   body {
     margin: 0;
     height: 100vh;
@@ -81,18 +83,18 @@
       <SettingsComponent />
     </nav>
     <BrowserComponent v-bind:url="url" v-bind:fired.sync="fired" />
-    <LoadingComponent />
+    <StatusComponent />
   </div>
 </template>
 
 <script>
-import LoadingComponent from './components/LoadingComponent.vue';
+import StatusComponent from './components/StatusComponent.vue';
 import SettingsComponent from './components/SettingsComponent.vue';
 import BrowserComponent from './components/BrowserComponent.vue';
 
 export default {
   name: 'app',
-  components: { LoadingComponent, SettingsComponent, BrowserComponent },
+  components: { StatusComponent, SettingsComponent, BrowserComponent },
   data() {
     return {
       url: 'https://www.motherfuckingwebsite.com',
