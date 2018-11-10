@@ -1,6 +1,5 @@
 // eslint-disable-next-line import/no-unresolved
 import { seconds, spawnServers } from 'common/util';
-import Vue from 'vue';
 
 const state = {
   message: 'You are not connected to the network.',

@@ -8,7 +8,6 @@ const psNode = require('ps-node');
 
 // global reference to mainWindow (necessary to prevent window from being garbage collected)
 let mainWindow;
-let clientInstance;
 const pids = [];
 
 function createMainWindow() {
