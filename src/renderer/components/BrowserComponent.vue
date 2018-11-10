@@ -4,7 +4,7 @@
     height: 100%;
     display: flex;
   }
-  iframe {
+  iframe, webview {
     flex-grow: 1;
     border: none;
   }
@@ -12,7 +12,8 @@
 
 <template>
   <div class="content">
-    <iframe :srcdoc="response === null ? initialHTML : response" />
+    <iframe :srcdoc="initialHTML" v-if="actualURL === null" />
+    <webview v-else :src="actualURL"></webview>
   </div>
 </template>
 
@@ -30,7 +31,8 @@ export default {
     };
   },
   computed: mapState({
-    response: state => state.query.response,
+    // response: state => state.query.response,
+    actualURL: state => state.query.actualURL,
     connected: state => state.status.connected,
   }),
   watch: {

@@ -1,5 +1,6 @@
 // eslint-disable-next-line import/no-unresolved
-import { seconds } from 'common/util';
+import { seconds, spawnServers } from 'common/util';
+import Vue from 'vue';
 
 const state = {
   message: 'You are not connected to the network.',
@@ -28,14 +29,11 @@ const actions = {
       }
     }, 1000);
   },
-  startServers({ commit, dispatch }) {
-    // prepare for Directory, use placeholder wait
-    commit('connecting');
-    // simulate a connection to the Directory.
-    setTimeout(() => {
-      commit('connectionFailed');
-      dispatch('decrementDelay');
-    }, 3000);
+  startServers({ commit }) {
+    spawnServers();
+    commit('connected');
+    // TODO: check that directory and servers are up.
+    // find a better way to instantiate the servers
   },
 };
 

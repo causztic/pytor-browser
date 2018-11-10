@@ -16,7 +16,7 @@ new Vue({
       electron: process.versions.electron,
       // eslint-disable-next-line global-require
       electronWebpack: require('electron-webpack/package.json').version,
-    },
+    }
   },
   components: { App },
   template: '<App />',
