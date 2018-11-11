@@ -449,6 +449,7 @@ class Responder(BaseHTTPRequestHandler):
     def _handle_url(url_path):
         fallback = "http://www.motherfuckingwebsite.com"
         query = urllib.parse.parse_qs(url_path[2:])
+        # TODO: refactor with regex
         if not query:
             index1 = url_path.find("http://")
             index2 = url_path.find("https://")
@@ -456,7 +457,6 @@ class Responder(BaseHTTPRequestHandler):
                 return url_path[index1:]
             if index2 != -1:
                 return url_path[index2:]
-            return fallback
         if "req" in query:
             return query["req"][0]
         return fallback

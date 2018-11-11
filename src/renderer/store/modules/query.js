@@ -13,6 +13,10 @@ const actions = {
   getWebsite({
     state, commit, dispatch, rootState,
   }, website) {
+    if (!website.startsWith('http://') && !website.startsWith('https://')) {
+      website = `http://${website}`;
+    }
+
     if (rootState.status.connected) {
       if (state.history.slice(-1)[0] !== website) {
         dispatch('status/load', { website }, { root: true });
@@ -29,7 +33,6 @@ const mutations = {
     state.history.push(website);
   },
   setActualURL(state, website) {
-    console.log(website);
     state.actualURL = `http://localhost:27182?${website}`;
   },
 };
