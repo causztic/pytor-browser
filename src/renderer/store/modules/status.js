@@ -13,8 +13,6 @@ const state = {
 const actions = {
   load({ commit }, { website }) {
     commit('loading', website);
-    // TODO: check if website is loaded with webview's API instead of hard coding.
-    commit('connected');
   },
   connected({ commit }) {
     commit('connected');

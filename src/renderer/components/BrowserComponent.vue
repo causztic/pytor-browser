@@ -3,37 +3,45 @@
     width: 100%;
     height: 100%;
     display: flex;
+    align-items: center;
+    justify-content: center;
   }
-  iframe, webview {
+  .icon {
+    width: 75px;
+    height: 75px;
+    opacity: 0.25;
+  }
+  webview {
     flex-grow: 1;
     border: none;
+    width: 100%;
+    height: 100%;
   }
 </style>
 
 <template>
   <div class="content">
-    <iframe :srcdoc="initialHTML" v-if="actualURL === null" />
-    <webview v-else :src="actualURL"></webview>
+    <img class="icon" src="./../onion.png" v-show="actualURL === null" />
+    <webview v-show="actualURL !== null" :src="actualURL"
+      @did-stop-loading="loadStop"></webview>
   </div>
 </template>
 
 <script>
 import { mapState } from 'vuex';
 
-const initialHTML = require('../503.html');
-
 export default {
   name: 'BrowserComponent',
   props: ['url', 'fired'],
-  data() {
-    return {
-      initialHTML,
-    };
-  },
   computed: mapState({
     actualURL: state => state.query.actualURL,
     connected: state => state.status.connected,
   }),
+  methods: {
+    loadStop() {
+      this.$store.dispatch('status/connected');
+    },
+  },
   watch: {
     fired(newVal, _) {
       if (newVal && this.connected) {

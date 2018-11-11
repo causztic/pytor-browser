@@ -11,11 +11,12 @@ const getters = {};
 // actions
 const actions = {
   getWebsite({
-    commit, dispatch, rootState,
+    state, commit, dispatch, rootState,
   }, website) {
-    // TODO: unsure whether creating multiple callbacks will be inefficient.
     if (rootState.status.connected) {
-      dispatch('status/load', { website }, { root: true });
+      if (state.history.slice(-1)[0] !== website) {
+        dispatch('status/load', { website }, { root: true });
+      }
       commit('setActualURL', website);
       commit('addQueryToHistory', website);
     }
