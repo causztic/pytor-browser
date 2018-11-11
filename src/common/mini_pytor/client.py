@@ -5,7 +5,6 @@ import sys
 import json
 import struct
 import socket
-import random
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import urllib
@@ -19,6 +18,7 @@ from cryptography.exceptions import InvalidSignature
 
 import util
 from cell import Cell, CellType
+
 
 class Client:
     """Client class"""
@@ -410,8 +410,7 @@ class Responder(BaseHTTPRequestHandler):
         """Get request response method"""
         my_client = Client()
         # Get references from directories.
-        # Connect randomly
-        relay_list = random.shuffle(Client.get_directory_items())
+        relay_list = Client.get_directory_items()
         NUM_RELAYS = 3
         options = {
             0: my_client.first_connect,

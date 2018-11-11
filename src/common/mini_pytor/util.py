@@ -11,7 +11,7 @@ from cryptography.hazmat.backends import default_backend
 from cell import Cell
 
 RELAY_DEBUG = True
-CLIENT_DEBUG = False
+CLIENT_DEBUG = True
 
 def padder128(data):
     """ pad ip to 256 bits... because this can vary too"""
