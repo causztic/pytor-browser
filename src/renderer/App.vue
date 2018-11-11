@@ -82,7 +82,7 @@
       </div>
       <SettingsComponent />
     </nav>
-    <BrowserComponent v-bind:url="url" v-bind:fired.sync="fired" />
+    <BrowserComponent v-bind:url="url" v-bind:fired.sync="fired" v-on:linkClick="updateURL"/>
     <StatusComponent />
   </div>
 </template>
@@ -102,6 +102,9 @@ export default {
     };
   },
   methods: {
+    updateURL(url) {
+      this.url = url;
+    },
     navigate() {
       this.fired = true;
     },

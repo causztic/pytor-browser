@@ -23,7 +23,7 @@
   <div class="content">
     <img class="icon" src="./../onion.png" v-show="actualURL === null" />
     <webview v-show="actualURL !== null" :src="actualURL"
-      @did-stop-loading="loadStop"></webview>
+      @did-stop-loading="loadStop" @will-navigate="injectURL"></webview>
   </div>
 </template>
 
@@ -40,6 +40,11 @@ export default {
   methods: {
     loadStop() {
       this.$store.dispatch('status/connected');
+    },
+    injectURL(event) {
+      event.preventDefault();
+      this.$emit('linkClick', event.url);
+      this.$store.dispatch('query/getWebsite', event.url);
     },
   },
   watch: {

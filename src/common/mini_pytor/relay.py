@@ -433,7 +433,7 @@ def main():
     if len(sys.argv) == 3:
         RELAY_DEBUG = True
 
-    if len(sys.argv) > 2:
+    if len(sys.argv) >= 2:
         identity = 3
         port = sys.argv[1]  # was 1 -> 0
         if port == "a":
