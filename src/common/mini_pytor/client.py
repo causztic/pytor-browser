@@ -6,6 +6,7 @@ import json
 import struct
 import socket
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from random import sample
 
 import urllib
 import requests
@@ -332,7 +333,7 @@ class Client:
         try:
             sock = intermediate_relays[0].sock
             sock.send(pickle.dumps(sending_cell))
-            recv_cell = sock.recv(8192)
+            recv_cell = sock.recv(4790)
             their_cell = pickle.loads(recv_cell)
             if util.CLIENT_DEBUG:
                 print("received cell")
@@ -351,7 +352,7 @@ class Client:
                     print("Information is being Streamed. ", file=sys.stderr)
                 summation = [their_cell.payload]
                 while their_cell.type == CellType.CONTINUE:
-                    recv_cell = sock.recv(8192)  # await answer
+                    recv_cell = sock.recv(4790)  # await answer
                     # you now receive a cell with encrypted payload.
                     their_cell = pickle.loads(recv_cell)
                     if util.CLIENT_DEBUG:
@@ -411,6 +412,8 @@ class Responder(BaseHTTPRequestHandler):
         my_client = Client()
         # Get references from directories.
         relay_list = Client.get_directory_items()
+        relay_list = sample(relay_list, 3)
+        print(relay_list)
         NUM_RELAYS = 3
         options = {
             0: my_client.first_connect,

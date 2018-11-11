@@ -15,6 +15,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric import rsa
 
 import util
 from cell import Cell, CellType
@@ -42,9 +43,17 @@ class Relay():
             os.path.dirname(__file__),
             "privates/privatetest" + str(identity) + ".pem"
         )
-        temp_open = open(pem_file, "rb")
-        self.true_private_key = serialization.load_pem_private_key(
-            temp_open.read(), password=None, backend=default_backend())  # used for signing, etc.
+        if identity:  # if identity was provided
+            temp_open = open(pem_file, "rb")
+            self.true_private_key = serialization.load_pem_private_key(
+                temp_open.read(), password=None, backend=default_backend())
+
+        else:  # no provided identity. Generate a key.
+            self.true_private_key = rsa.generate_private_key(
+                backend=default_backend(),
+                public_exponent=65537,
+                key_size=4096
+            )
         self.sendingpublickey = self.true_private_key.public_key()
 
         serialised_public_key = self.sendingpublickey.public_bytes(
@@ -428,10 +437,11 @@ class Relay():
 
 def main():
     """Main function"""
-    # sys.argv = input("you know the drill. \n")  # added for my debug
-    if len(sys.argv) == 2:
-        identity = 3
-        port = sys.argv[1]  # was 1 -> 0
+    sys.argv = input("you know the drill. \n")  # added for my debug
+    sys.argv = sys.argv.split()  # added for console debug
+    if len(sys.argv) == 1:  # was 2 -> 1
+        identity = None
+        port = sys.argv[0]  # was 1 -> 0
         if port == "a":
             port = 45000
             identity = 0
@@ -441,11 +451,14 @@ def main():
         elif port == "c":
             port = 45002
             identity = 2
+        else:  # remove after console debug is over.
+            port = int(port)  # remove after console debug is over
     else:
         print("Usage: python relay.py [port]")
         return
-
     relay = Relay(int(port), identity)
+    if not isinstance(identity, int):  # identity was a none-type
+        identity = 22222  # Optionally remove after console Debug is over.
     print("Started relay on %d with identity %d" % (port, identity))
 
     while True:
