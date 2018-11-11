@@ -19,6 +19,7 @@ from cryptography.hazmat.primitives import hashes
 import util
 from cell import Cell, CellType
 
+RELAY_DEBUG = False
 
 class ClientData:
     """Client data class"""
@@ -431,7 +432,7 @@ def main():
     """Main function"""
     # sys.argv = input("you know the drill. \n")  # added for my debug
     if len(sys.argv) == 3:
-        RELAY_DEBUG = True
+        global RELAY_DEBUG = True
 
     if len(sys.argv) >= 2:
         identity = 3
@@ -457,5 +458,4 @@ def main():
 
 
 if __name__ == "__main__":
-    RELAY_DEBUG = False
     main()

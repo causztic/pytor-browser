@@ -19,6 +19,7 @@ from cryptography.exceptions import InvalidSignature
 import util
 from cell import Cell, CellType
 
+CLIENT_DEBUG = False
 
 class Client:
     """Client class"""
@@ -449,7 +450,6 @@ class Responder(BaseHTTPRequestHandler):
     def _handle_url(url_path):
         fallback = "http://www.motherfuckingwebsite.com"
         query = urllib.parse.parse_qs(url_path[2:])
-        # TODO: refactor with regex
         if not query:
             index1 = url_path.find("http://")
             index2 = url_path.find("https://")
@@ -482,7 +482,6 @@ def main():
     httpd.serve_forever()
 
 if __name__ == "__main__":
-    CLIENT_DEBUG = False
     if len(sys.argv) == 2:
-        CLIENT_DEBUG = True
+        global CLIENT_DEBUG = True
     main()
