@@ -3,36 +3,50 @@
     width: 100%;
     height: 100%;
     display: flex;
+    align-items: center;
+    justify-content: center;
   }
-  iframe {
+  .icon {
+    width: 75px;
+    height: 75px;
+    opacity: 0.25;
+  }
+  webview {
     flex-grow: 1;
     border: none;
+    width: 100%;
+    height: 100%;
   }
 </style>
 
 <template>
   <div class="content">
-    <iframe :srcdoc="response === null ? initialHTML : response" />
+    <img class="icon" src="./../onion.png" v-show="actualURL === null" />
+    <webview v-show="actualURL !== null" :src="actualURL"
+      @did-stop-loading="loadStop" @will-navigate="injectURL"></webview>
   </div>
 </template>
 
 <script>
 import { mapState } from 'vuex';
 
-const initialHTML = require('../503.html');
-
 export default {
   name: 'BrowserComponent',
   props: ['url', 'fired'],
-  data() {
-    return {
-      initialHTML,
-    };
-  },
   computed: mapState({
-    response: state => state.query.response,
+    actualURL: state => state.query.actualURL,
     connected: state => state.status.connected,
   }),
+  methods: {
+    loadStop() {
+      this.$store.dispatch('status/connected');
+    },
+    injectURL(event) {
+      event.preventDefault();
+      this.$emit('linkClick', event.url);
+      this.$store.dispatch('query/getWebsite', event.url);
+    },
+  },
   watch: {
     fired(newVal, _) {
       if (newVal && this.connected) {
@@ -42,7 +56,7 @@ export default {
     },
   },
   created() {
-    Promise.resolve(this.$store.dispatch('status/startServers'));
+    this.$store.dispatch('status/startServers');
   },
 };
 </script>

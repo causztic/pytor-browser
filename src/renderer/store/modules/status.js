@@ -1,48 +1,43 @@
 // eslint-disable-next-line import/no-unresolved
-import { spawnServers } from 'common/util';
+import { seconds, spawnClientAndServers } from 'common/util';
+
+const electron = require('electron');
 
 const state = {
   message: 'You are not connected to the network.',
   connected: false,
   connectionState: 'not_connected',
+  serverNodes: [],
+  directoryQueryDelay: 1000,
+  directoryQueryDelayCounter: 1000,
 };
 
 const actions = {
-  load({ commit }) {
-    commit('loading');
+  load({ commit }, { website }) {
+    commit('loading', website);
   },
   connected({ commit }) {
     commit('connected');
   },
-  startServers({ commit, state }) {
-    if (!state.connected) {
-      const instances = spawnServers();
-      commit('connecting');
-      return new Promise((resolve, _) => {
-        // TODO: check for server timeouts
-        // TODO: update to check for exact server startup
-        instances.forEach((instance) => {
-          instance.stdout.on('data', (data) => {
-            console.log(`stdin: ${data}`);
-          });
-
-          instance.stderr.on('data', (data) => {
-            console.log(`stderr: ${data}`);
-          });
-
-          instance.on('close', (code) => {
-            console.log(`child process exited with code ${code}`);
-          });
-        });
-
-        setTimeout(() => {
-          commit('connected');
-          resolve();
-        }, 300);
-      });
-    }
-    return new Promise((resolve, _) => {
-      resolve();
+  decrementDelay({ commit, dispatch }) {
+    // try again after a certain time.
+    setTimeout(() => {
+      commit('decrementDelay');
+      if (state.directoryQueryDelayCounter === 0) {
+        dispatch('startServers');
+      } else {
+        dispatch('decrementDelay');
+      }
+    }, 1000);
+  },
+  startServers({ commit }) {
+    // TODO: check that directory and servers are up.
+    // find a better way to instantiate the servers
+    spawnClientAndServers().then(() => {
+      commit('connected');
+    }).catch(() => {
+      electron.ipcRenderer.send('clear-pids');
+      commit('decerementDelay');
     });
   },
 };
@@ -53,14 +48,26 @@ const mutations = {
     state.connectionState = 'connecting';
     state.connected = false;
   },
-  loading(state) {
-    state.message = 'Loading page..';
+  loading(state, website) {
+    state.message = `Loading ${website}..`;
     state.connectionState = 'connecting';
   },
   connected(state) {
     state.message = 'Connected to network.';
     state.connectionState = 'connected';
     state.connected = true;
+  },
+  connectionFailed(state) {
+    state.directoryQueryDelay *= 2;
+    state.directoryQueryDelayCounter = state.directoryQueryDelay;
+    state.message = `Failed to connect to Directory. Retry in ${seconds(state.directoryQueryDelayCounter)}..`;
+    state.connectionState = 'not-connected';
+    state.connected = false;
+  },
+  decrementDelay(state) {
+    state.directoryQueryDelayCounter -= 1000;
+    state.message = `Failed to connect to Directory. Retry in ${seconds(state.directoryQueryDelayCounter)}..`;
+    state.connectionState = 'not-connected';
   },
 };
 

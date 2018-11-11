@@ -1,10 +1,7 @@
-// eslint-disable-next-line import/no-unresolved
-import { spawnClient } from 'common/util';
-
 // initial state
 const state = {
   history: [],
-  response: null,
+  actualURL: null,
   status: null,
 };
 
@@ -13,29 +10,20 @@ const getters = {};
 
 // actions
 const actions = {
-  getWebsite({ dispatch, commit }, website) {
-    dispatch('status/load', null, { root: true });
-    commit('setResponse', null);
-    const result = spawnClient(website);
+  getWebsite({
+    state, commit, dispatch, rootState,
+  }, website) {
+    if (!website.startsWith('http://') && !website.startsWith('https://')) {
+      website = `http://${website}`;
+    }
 
-    console.log(result);
-
-    result.stdout.on('data', (data) => {
-      console.log(`stdout: ${data}`);
-
+    if (rootState.status.connected) {
+      if (state.history.slice(-1)[0] !== website) {
+        dispatch('status/load', { website }, { root: true });
+      }
+      commit('setActualURL', website);
       commit('addQueryToHistory', website);
-      commit('setResponse', data);
-    });
-
-    result.stderr.on('data', (data) => {
-      console.log(`stderr: ${data}`);
-      commit('setResponse', null);
-    });
-
-    result.on('close', (code) => {
-      console.log(`child process exited with code ${code}`);
-      dispatch('status/connected', null, { root: true });
-    });
+    }
   },
 };
 
@@ -44,8 +32,8 @@ const mutations = {
   addQueryToHistory(state, website) {
     state.history.push(website);
   },
-  setResponse(state, response) {
-    state.response = response;
+  setActualURL(state, website) {
+    state.actualURL = `http://localhost:27182?${website}`;
   },
 };
 

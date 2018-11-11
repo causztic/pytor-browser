@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, ipcMain } from 'electron';
 import * as path from 'path';
 import { format as formatUrl } from 'url';
 // eslint-disable-next-line import/no-unresolved
@@ -45,9 +45,14 @@ function createMainWindow() {
   return window;
 }
 
-
-require('electron').ipcMain.on('pid-msg', (_, arg) => {
+ipcMain.on('pid-msg', (_, arg) => {
   pids.push(arg);
+});
+
+ipcMain.on('clear-pids', () => {
+  pids.forEach((pid) => {
+    psNode.kill(pid);
+  });
 });
 
 app.on('before-quit', () => {
