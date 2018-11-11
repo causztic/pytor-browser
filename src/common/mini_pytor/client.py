@@ -463,6 +463,7 @@ class Responder(BaseHTTPRequestHandler):
             return query["req"][0]
         return fallback
 
+
 class RelayData:
     """Relay data class"""
 
@@ -482,6 +483,7 @@ def main():
     server_address = ('', 27182)
     httpd = HTTPServer(server_address, Responder)
     httpd.serve_forever()
+
 
 if __name__ == "__main__":
     main()

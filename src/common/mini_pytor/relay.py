@@ -437,11 +437,11 @@ class Relay():
 
 def main():
     """Main function"""
-    sys.argv = input("you know the drill. \n")  # added for my debug
-    sys.argv = sys.argv.split()  # added for console debug
-    if len(sys.argv) == 1:  # was 2 -> 1
+    # sys.argv = input("you know the drill. \n")  # added for my debug
+    # sys.argv = sys.argv.split()  # added for console debug
+    if len(sys.argv) == 2:  # was 2 -> 1
         identity = None
-        port = sys.argv[0]  # was 1 -> 0
+        port = sys.argv[1]  # was 1 -> 0
         if port == "a":
             port = 45000
             identity = 0
@@ -451,15 +451,15 @@ def main():
         elif port == "c":
             port = 45002
             identity = 2
-        else:  # remove after console debug is over.
-            port = int(port)  # remove after console debug is over
+
     else:
         print("Usage: python relay.py [port]")
         return
     relay = Relay(int(port), identity)
-    if not isinstance(identity, int):  # identity was a none-type
-        identity = 22222  # Optionally remove after console Debug is over.
-    print("Started relay on %d with identity %d" % (port, identity))
+    # identity might be None, so change to "None" if it is.
+    if not identity:
+        identity = "None"
+    print("Started relay on "+str(port) + "with identity " + identity)
 
     while True:
         relay.run()
