@@ -60,7 +60,7 @@ class Client:
         # send the initialising cell, by sending the DHpublicKeyBytes
         sending_cell = Cell(dh_pubkey_bytes, ctype=CellType.ADD_CON)
         readied_cell = pickle.dumps(sending_cell)
-        if util.CLIENT_DEBUG:
+        if CLIENT_DEBUG:
             print("First connect actual cell (encrypted bytes) ")
             print(readied_cell)
         encrypted_cell = rsa_public_key.encrypt(
@@ -97,7 +97,7 @@ class Client:
             return derived_key
 
         except InvalidSignature:
-            if util.CLIENT_DEBUG:
+            if CLIENT_DEBUG:
                 print("Something went wrong.. Signature was invalid.",
                       file=sys.stderr)
             return None
@@ -109,7 +109,7 @@ class Client:
             sock.connect((gonnect, gonnectport))
             encrypted_cell, ec_privkey = Client.make_first_connect_cell(
                 rsa_key)
-            if util.CLIENT_DEBUG:
+            if CLIENT_DEBUG:
                 print("First connect actual cell (decrypted bytes)")
                 print(encrypted_cell)
             sock.send(encrypted_cell)  # Send them my generated ecdhe key.
@@ -122,7 +122,7 @@ class Client:
             # attempt to check the signature and derive their key.
 
             if derived_key:  # ie did not return None.
-                if util.CLIENT_DEBUG:
+                if CLIENT_DEBUG:
                     print("Connected successfully to relay @ " + gonnect
                           + "   Port: " + str(gonnectport))
                 self.relay_list.append(
@@ -136,7 +136,7 @@ class Client:
     def more_connect_1(self, gonnect, gonnectport, rsa_key):
         """Connect to the next relay through the first one."""
         encrypted_cell, ec_privkey = Client.make_first_connect_cell(rsa_key)
-        if util.CLIENT_DEBUG:
+        if CLIENT_DEBUG:
             print("Innermost cell with keys (encrypted)")
             print(encrypted_cell)
 
@@ -156,7 +156,7 @@ class Client:
         try:
             sock = intermediate_relays[0].sock
             sock.send(pickle.dumps(sending_cell))  # send over the cell
-            if util.CLIENT_DEBUG:
+            if CLIENT_DEBUG:
                 print("Cell sent: ")
                 print(pickle.dumps(sending_cell))
             their_cell = sock.recv(4096)  # await answer
@@ -164,15 +164,15 @@ class Client:
             their_cell = pickle.loads(their_cell)
             decrypted = util.aes_decryptor(
                 intermediate_relays[0].key, their_cell)
-            if util.CLIENT_DEBUG:
+            if CLIENT_DEBUG:
                 print(decrypted)
             their_cell = pickle.loads(decrypted)
-            if util.CLIENT_DEBUG:
+            if CLIENT_DEBUG:
                 print(their_cell.payload)
             their_cell = pickle.loads(their_cell.payload)
 
             if their_cell.type == CellType.FAILED:
-                if util.CLIENT_DEBUG:
+                if CLIENT_DEBUG:
                     print("FAILED AT CONNECTION!", file=sys.stderr)
                 if their_cell.payload == "CONNECTIONREFUSED":
                     print("Connection was refused. Is the relay online yet?")
@@ -184,21 +184,21 @@ class Client:
             self.relay_list.append(
                 RelayData(gonnect, sock, derived_key, ec_privkey, rsa_key, gonnectport))
 
-            if util.CLIENT_DEBUG:
+            if CLIENT_DEBUG:
                 print("Connected successfully to relay @ " + gonnect
                       + "   Port: " + str(gonnectport), file=sys.stderr)
 
         except (ConnectionResetError, ConnectionRefusedError, struct.error):
-            if util.CLIENT_DEBUG:
+            if CLIENT_DEBUG:
                 print("Socket Error, removing from the list.", file=sys.stderr)
             del self.relay_list[0]  # remove it from the lsit
-            if util.CLIENT_DEBUG:
+            if CLIENT_DEBUG:
                 print("REMOVED relay 0 DUE TO FAILED CONNECTION")
 
     def more_connect_2(self, gonnect, gonnectport, rsa_key):
         """Connect to the next relay through my 2 connected relays."""
         encrypted_cell, ec_privkey = Client.make_first_connect_cell(rsa_key)
-        if util.CLIENT_DEBUG:
+        if CLIENT_DEBUG:
             print("Innermost cell with keys (encrypted)", file=sys.stderr)
             print(encrypted_cell)
 
@@ -238,17 +238,17 @@ class Client:
             sock.send(pickle.dumps(sending_cell))  # send over the cell
             their_cell = sock.recv(4096)  # await answer
             # you now receive a cell with encrypted payload.
-            if util.CLIENT_DEBUG:
+            if CLIENT_DEBUG:
                 print(their_cell)
             their_cell = pickle.loads(their_cell)
-            if util.CLIENT_DEBUG:
+            if CLIENT_DEBUG:
                 print(their_cell.payload)
             counter = 0
             while counter < len(intermediate_relays):
                 # print(their_cell.payload)
                 decrypted = util.aes_decryptor(
                     intermediate_relays[counter].key, their_cell)
-                if util.CLIENT_DEBUG:
+                if CLIENT_DEBUG:
                     print(decrypted)
                 their_cell = pickle.loads(decrypted)
                 # print(their_cell.payload)
@@ -257,7 +257,7 @@ class Client:
                     their_cell = their_cell.payload
 
             if their_cell.type == CellType.FAILED:
-                if util.CLIENT_DEBUG:
+                if CLIENT_DEBUG:
                     print("FAILED AT CONNECTION!", file=sys.stderr)
                 return
 
@@ -268,7 +268,7 @@ class Client:
             self.relay_list.append(
                 RelayData(gonnect, sock, derived_key, ec_privkey, rsa_key, gonnectport))
 
-            if util.CLIENT_DEBUG:
+            if CLIENT_DEBUG:
                 print("Connected successfully to relay @ " + gonnect
                       + "   Port: " + str(gonnectport), file=sys.stderr)
         except struct.error:
@@ -322,7 +322,7 @@ class Client:
 
     def req(self, request):
         """send out stuff in router."""
-        if util.CLIENT_DEBUG:
+        if CLIENT_DEBUG:
             print("REQUEST SENDING TEST")
         # must send IV and a cell that is encrypted with the next public key
         # public key list will have to be accessed in order with list of relays
@@ -334,7 +334,7 @@ class Client:
             sock.send(pickle.dumps(sending_cell))
             recv_cell = sock.recv(8192)
             their_cell = pickle.loads(recv_cell)
-            if util.CLIENT_DEBUG:
+            if CLIENT_DEBUG:
                 print("received cell")
                 print(len(recv_cell))
                 print(recv_cell)
@@ -347,14 +347,14 @@ class Client:
                 return Client.failure()  # return failure
 
             if their_cell.type == CellType.CONTINUE:
-                if util.CLIENT_DEBUG:
+                if CLIENT_DEBUG:
                     print("Information is being Streamed. ", file=sys.stderr)
                 summation = [their_cell.payload]
                 while their_cell.type == CellType.CONTINUE:
                     recv_cell = sock.recv(8192)  # await answer
                     # you now receive a cell with encrypted payload.
                     their_cell = pickle.loads(recv_cell)
-                    if util.CLIENT_DEBUG:
+                    if CLIENT_DEBUG:
                         print("received PART", file=sys.stderr)
                         print(len(recv_cell), file=sys.stderr)
                         print(recv_cell, file=sys.stderr)
@@ -378,7 +378,7 @@ class Client:
             # check if it's a response type item.
             # This check is unnecessary based off code though...
             # Left in in case of attack
-            if util.CLIENT_DEBUG:
+            if CLIENT_DEBUG:
                 print(response.content, file=sys.stderr)
                 print(response.status_code, file=sys.stderr)
             return_dict = {
@@ -482,4 +482,7 @@ def main():
     httpd.serve_forever()
 
 if __name__ == "__main__":
+    CLIENT_DEBUG = False
+    if len(sys.argv) == 2:
+        CLIENT_DEBUG = True
     main()

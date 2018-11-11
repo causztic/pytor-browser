@@ -10,8 +10,7 @@ from cryptography.hazmat.backends import default_backend
 
 from cell import Cell
 
-CLIENT_DEBUG = False
-RELAY_DEBUG = False
+RELAY_DEBUG = True
 
 
 def padder128(data):

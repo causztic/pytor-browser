@@ -49,6 +49,12 @@ ipcMain.on('pid-msg', (_, arg) => {
   pids.push(arg);
 });
 
+ipcMain.on('clear-pids', () => {
+  pids.forEach((pid) => {
+    psNode.kill(pid);
+  });
+});
+
 app.on('before-quit', () => {
   pids.forEach((pid) => {
     psNode.kill(pid);

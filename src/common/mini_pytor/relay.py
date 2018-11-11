@@ -124,7 +124,7 @@ class Relay():
                           salt=salty, ctype=CellType.CONNECT_RESP)
         signature = self.sign(salty)  # sign the random bytes
         reply_cell.signature = signature  # assign the signature.
-        if util.RELAY_DEBUG:
+        if RELAY_DEBUG:
             print("reply cell")
             print(pickle.dumps(reply_cell))
         # send them the serialised version.
@@ -135,7 +135,7 @@ class Relay():
         """A method to handle client connections."""
         obtained_cell = client_sock.recv(4096)
         try:
-            if util.RELAY_DEBUG:
+            if RELAY_DEBUG:
                 print("raw data obtained. (Cell)")
                 print(obtained_cell)
             # decrypt the item.
@@ -145,12 +145,12 @@ class Relay():
             print("Rejected one connection", file=sys.stderr)
             return None
 
-        if util.RELAY_DEBUG:
+        if RELAY_DEBUG:
             print("Decrypted cell with actual keys.")
             print(obtained_cell)
 
         obtained_cell = pickle.loads(obtained_cell)
-        if util.RELAY_DEBUG:
+        if RELAY_DEBUG:
             print("after pickle load")
             print(obtained_cell)
         if obtained_cell.type != CellType.ADD_CON:  # wrongly generated cell!
@@ -180,7 +180,7 @@ class Relay():
             sock = socket.socket(
                 socket.AF_INET, socket.SOCK_STREAM)
             sock.connect((cell_to_next.ip_addr, cell_to_next.port))
-            if util.RELAY_DEBUG:
+            if RELAY_DEBUG:
                 print((cell_to_next.ip_addr, cell_to_next.port))
                 print("cell to next")
                 print(decrypted)
@@ -189,7 +189,7 @@ class Relay():
             # send over the cell payload
             sock.send(cell_to_next.payload)
             their_cell = sock.recv(4096)  # await answer
-            if util.RELAY_DEBUG:
+            if RELAY_DEBUG:
                 print("got values")
                 print(their_cell)
             if their_cell == b"":
@@ -198,7 +198,7 @@ class Relay():
                     Cell("", ctype=CellType.FAILED)
                 )
 
-                if util.RELAY_DEBUG:
+                if RELAY_DEBUG:
                     print("sent failed")
                 socket_to_client.send(pickle.dumps(Cell(
                     encrypted,
@@ -209,7 +209,7 @@ class Relay():
                     client_reference["key"],
                     Cell(their_cell, ctype=CellType.CONNECT_RESP)
                 )
-                if util.RELAY_DEBUG:
+                if RELAY_DEBUG:
                     print("sent valid response")
                 socket_to_client.send(pickle.dumps(Cell(
                     encrypted,
@@ -273,7 +273,7 @@ class Relay():
 
                     client_reference["sock"].send(pickle.dumps(
                         Cell(encrypted, IV=init_vector, ctype=CellType.ADD_CON)))
-                    if util.RELAY_DEBUG:
+                    if RELAY_DEBUG:
                         print("Sent one packet")
                     # remove the bytes from the total bytes that have to be sent
                     del payload_bytes[:4096]
@@ -315,7 +315,7 @@ class Relay():
             # There is no next hop registered to this client.
             return
         sock = client_reference["bounce_socket"]
-        if util.RELAY_DEBUG:
+        if RELAY_DEBUG:
             print("bouncing cell's decrypted..")
             print(decrypted)
             print("payload")
@@ -329,7 +329,7 @@ class Relay():
             except socket.timeout:
                 their_cell = "request timed out!"
             their_cell = pickle.loads(their_cell)
-            if util.RELAY_DEBUG:
+            if RELAY_DEBUG:
                 print(f"Relay reply received type: {their_cell.type}")
             if their_cell.type != CellType.FINISHED:
                 print("Got answer back.. as a relay.")
@@ -411,7 +411,7 @@ class Relay():
                 # decrypt the obtained cell
                 cell_to_next = pickle.loads(decrypted)
 
-                if util.RELAY_DEBUG:
+                if RELAY_DEBUG:
                     print(f"Cell type: {cell_to_next.type}")
 
                 if cell_to_next.type == CellType.RELAY_CONNECT:
@@ -430,9 +430,12 @@ class Relay():
 def main():
     """Main function"""
     # sys.argv = input("you know the drill. \n")  # added for my debug
-    if len(sys.argv) == 2:  # was 2 -> 1
+    if len(sys.argv) == 3:
+        RELAY_DEBUG = True
+
+    if len(sys.argv) > 2:
         identity = 3
-        port = sys.argv[1]  # was 1 ->0
+        port = sys.argv[1]  # was 1 -> 0
         if port == "a":
             port = 45000
             identity = 0
@@ -454,4 +457,5 @@ def main():
 
 
 if __name__ == "__main__":
+    RELAY_DEBUG = False
     main()

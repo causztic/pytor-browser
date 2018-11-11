@@ -6,31 +6,46 @@ const isDevelopment = process.env.NODE_ENV !== 'production';
 // eslint-disable-next-line no-undef
 const staticPath = isDevelopment ? __static : __dirname.replace(/app\.asar$/, 'static');
 
-const spawnClient = () => {
-  const clientInstance = spawn(
-    'python',
-    ['./mini_pytor/client.py'],
-    { cwd: __dirname },
-  );
-  electron.ipcRenderer.send('pid-msg', clientInstance.pid);
-  return clientInstance;
+// set up listeners at the start of each spawn ASAP to avoid missing out
+const setUpListeners = (instance) => {
+  instance.stdout.on('data', (data) => {
+    console.log(`stdout: ${data}`);
+  });
+
+  instance.stderr.on('data', (data) => {
+    console.log(`stderr: ${data}`);
+    throw data;
+  });
+
+  instance.on('close', (code) => {
+    console.log(`child process exited with code ${code}`);
+  });
 };
 
-const spawnServers = () => {
+const spawnClientAndServers = () => {
   const directory = spawn('python', ['./mini_pytor/directory.py'], { cwd: __dirname });
-  const instances = [];
-  let client;
-
+  setUpListeners(directory);
   electron.ipcRenderer.send('pid-msg', directory.pid);
-  setTimeout(() => {
-    ['a', 'b', 'c'].forEach((instance) => {
-      const serverInstance = spawn('python', ['./mini_pytor/relay.py', instance], { cwd: __dirname });
-      instances.push(serverInstance);
-      electron.ipcRenderer.send('pid-msg', serverInstance.pid);
-    });
-    client = spawnClient();
-  }, 1000);
-  return { directory, client, servers: instances };
+
+  return new Promise((resolve, _) => {
+    setTimeout(() => {
+      ['a', 'b', 'c'].forEach((instance) => {
+        const serverInstance = spawn('python', ['./mini_pytor/relay.py', instance, true], { cwd: __dirname });
+        setUpListeners(serverInstance);
+        electron.ipcRenderer.send('pid-msg', serverInstance.pid);
+      });
+
+      const client = spawn(
+        'python',
+        ['./mini_pytor/client.py', true],
+        { cwd: __dirname },
+      );
+      setUpListeners(client);
+      electron.ipcRenderer.send('pid-msg', client.pid);
+
+      resolve();
+    }, 1000);
+  });
 };
 
 // convert milliseconds to seconds in string
@@ -42,5 +57,5 @@ const seconds = (milliseconds) => {
 };
 
 export {
-  isDevelopment, staticPath, spawnServers, spawnClient, seconds,
+  isDevelopment, staticPath, spawnClientAndServers, seconds,
 };

@@ -1,5 +1,7 @@
 // eslint-disable-next-line import/no-unresolved
-import { seconds, spawnServers } from 'common/util';
+import { seconds, spawnClientAndServers } from 'common/util';
+
+const electron = require('electron');
 
 const state = {
   message: 'You are not connected to the network.',
@@ -29,10 +31,14 @@ const actions = {
     }, 1000);
   },
   startServers({ commit }) {
-    spawnServers();
-    commit('connected');
     // TODO: check that directory and servers are up.
     // find a better way to instantiate the servers
+    spawnClientAndServers().then(() => {
+      commit('connected');
+    }).catch(() => {
+      electron.ipcRenderer.send('clear-pids');
+      commit('decerementDelay');
+    });
   },
 };
 
