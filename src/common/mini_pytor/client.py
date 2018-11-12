@@ -205,7 +205,6 @@ class Client:
                 if counter < len(intermediate_relays):
                     their_cell = their_cell.payload
             their_cell = pickle.loads(their_cell.payload)
-            print(their_cell.type)
 
             if their_cell.type == CellType.FAILED:
                 if util.CLIENT_DEBUG:
