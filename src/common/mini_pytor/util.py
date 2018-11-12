@@ -10,8 +10,11 @@ from cryptography.hazmat.backends import default_backend
 
 from cell import Cell
 
-RELAY_DEBUG = False
-CLIENT_DEBUG = False
+RELAY_DEBUG = True
+CLIENT_DEBUG = True
+RELAY_PACKET_SIZE_1 = 4406
+RELAY_PACKET_SIZE_2 = 4598
+CLIENT_PACKET_SIZE = 4790
 
 def padder128(data):
     """ pad ip to 256 bits... because this can vary too"""

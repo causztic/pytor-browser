@@ -205,7 +205,6 @@ class Client:
                 if counter < len(intermediate_relays):
                     their_cell = their_cell.payload
             their_cell = pickle.loads(their_cell.payload)
-            print(their_cell.type)
 
             if their_cell.type == CellType.FAILED:
                 if util.CLIENT_DEBUG:
@@ -305,18 +304,26 @@ class Client:
 
             if their_cell.type == CellType.CONTINUE:
                 if util.CLIENT_DEBUG:
-                    print("Information is being Streamed. ", file=sys.stderr)
+                    print("Information is being streamed.")
+                recv_bytes_arr = []
+                cont_loop = True
+                # get whole TCP stream and store it
+                while cont_loop:
+                    recv_bytes = sock.recv(util.CLIENT_PACKET_SIZE * 3)  # await answer
+                    if len(recv_bytes) < util.CLIENT_PACKET_SIZE:
+                        cont_loop = False
+                    recv_bytes_arr.append(recv_bytes)
+                total_payload = b"".join(recv_bytes_arr)
+                if util.CLIENT_DEBUG:
+                    print(f"Total length: {len(total_payload)}")
+                # partition the entire payload to MAX_PACKET_SIZE each
+                # and process them accordingly
                 summation = [their_cell.payload]
-                while their_cell.type == CellType.CONTINUE:
-                    recv_cell = sock.recv(4790)  # await answer
-                    # you now receive a cell with encrypted payload.
+                for i in range(0, len(total_payload), util.CLIENT_PACKET_SIZE):
+                    recv_cell = total_payload[i:i + util.CLIENT_PACKET_SIZE]
                     their_cell = pickle.loads(recv_cell)
                     if util.CLIENT_DEBUG:
-                        print("received PART", file=sys.stderr)
-                        print(len(recv_cell), file=sys.stderr)
-                        print(recv_cell, file=sys.stderr)
-                        print("received cell payload", file=sys.stderr)
-                        print(their_cell.payload, file=sys.stderr)
+                        print(f"Received packet, length {len(recv_cell)}")
                     their_cell = Client.chain_decryptor(
                         intermediate_relays, their_cell)
                     summation.append(their_cell.payload)

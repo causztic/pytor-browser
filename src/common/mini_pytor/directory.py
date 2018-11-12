@@ -85,8 +85,9 @@ class DirectoryServer:
                 "port": port_num,
                 "key": pubkey_bytes
             }
-            self.registered_relays.append(registered_relay_data)
-            self.relay_sockets.append(relay_socket)
+            if registered_relay_data not in self.registered_relays:
+                self.registered_relays.append(registered_relay_data)
+                self.relay_sockets.append(relay_socket)
         elif received_cell.type == CellType.GET_DIRECT:
             print("Got a directory request")
             relay_socket.settimeout(0.03)  # ensure we don't block forever

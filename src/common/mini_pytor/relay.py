@@ -20,6 +20,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 import util
 from cell import Cell, CellType
 
+
 class ClientData:
     """Client data class"""
 
@@ -273,40 +274,44 @@ class Relay():
                 print("Failed to receive response from website", file=sys.stderr)
 
             payload_bytes = pickle.dumps(req)
+            total_length = len(payload_bytes)
             if len(payload_bytes) > 4096:
-                # print("was larger")
                 payload_bytes = bytearray(payload_bytes)
                 while len(payload_bytes) > 4096:
                     encrypted, init_vector = util.aes_encryptor(
                         client_reference["key"],
                         Cell(payload_bytes[:4096], ctype=CellType.CONTINUE)
                     )
-
-                    client_reference["sock"].send(pickle.dumps(
-                        Cell(encrypted, IV=init_vector, ctype=CellType.ADD_CON)))
-                    if util.RELAY_DEBUG:
-                        print("Sent one packet")
+                    out_pickle = pickle.dumps(
+                        Cell(encrypted, IV=init_vector, ctype=CellType.ADD_CON))
+                    client_reference["sock"].send(out_pickle)
+                    print(f"Sent one packet, length {len(out_pickle)}")
                     # remove the bytes from the total bytes that have to be sent
                     del payload_bytes[:4096]
                     # slight delay for buffer issues
-                    time.sleep(10 / 1000000)
+                    time.sleep(0.0001)
 
                 # encrypt and send what is left.
                 encrypted, init_vector = util.aes_encryptor(
                     client_reference["key"],
-                    Cell(bytes(payload_bytes), ctype=CellType.CONNECT_RESP)
+                    Cell(payload_bytes, ctype=CellType.CONNECT_RESP)
                 )
-                client_reference["sock"].send(pickle.dumps(
-                    Cell(encrypted, IV=init_vector, ctype=CellType.FINISHED)))
+                out_pickle = pickle.dumps(
+                    Cell(encrypted, IV=init_vector, ctype=CellType.FINISHED))
+                client_reference["sock"].send(out_pickle)
+                print(f"Sent last packet, length {len(out_pickle)}")
                 print("Finished sending valid replies.")
             else:
                 encrypted, init_vector = util.aes_encryptor(
                     client_reference["key"],
                     Cell(payload_bytes, ctype=CellType.CONNECT_RESP)
                 )
-                client_reference["sock"].send(pickle.dumps(
-                    Cell(encrypted, IV=init_vector, ctype=CellType.FINISHED)))
+                out_pickle = pickle.dumps(
+                    Cell(encrypted, IV=init_vector, ctype=CellType.FINISHED))
+                client_reference["sock"].send(out_pickle)
+                print(f"Sent only packet, length {len(out_pickle)}")
                 print("Finished sending valid reply.")
+            print(f"Total length: {total_length}")
 
         else:
             encrypted, init_vector = util.aes_encryptor(
@@ -332,42 +337,52 @@ class Relay():
             print("payload")
             print(cell_to_next.payload)
             print(cell_to_next.type)
+            print("\n\n")
 
         sock.send(cell_to_next.payload)  # send over the cell
         while True:
             try:
-                their_cell = sock.recv(32768)  # await answer
+                recv_bytes = sock.recv(util.RELAY_PACKET_SIZE_2 * 3)
+                if not recv_bytes:
+                    return
             except socket.timeout:
                 their_cell = "request timed out!"
-            their_cell = pickle.loads(their_cell)
-            if util.RELAY_DEBUG:
-                print(f"Relay reply received type: {their_cell.type}")
-            if their_cell.type != CellType.FINISHED:
-                print("Got answer back.. as a relay.")
-                encrypted, init_vector = util.aes_encryptor(
-                    client_reference["key"],
-                    Cell(their_cell, ctype=CellType.CONNECT_RESP)
-                )
-                client_reference["sock"].send(pickle.dumps(Cell(
-                    encrypted,
-                    IV=init_vector,
-                    ctype=CellType.CONTINUE
-                )))
-                print("Relayed a packet.")
+            print("================================================")
+            print(f"Received packet, length {len(recv_bytes)}")
+            if len(recv_bytes) % util.RELAY_PACKET_SIZE_1 == 0:
+                pack_size = util.RELAY_PACKET_SIZE_1
             else:
-                print("Received the last packet.")
-                encrypted, init_vector = util.aes_encryptor(
-                    client_reference["key"],
-                    Cell(their_cell, ctype=CellType.FINISHED)
-                )
-                client_reference["sock"].send(pickle.dumps(Cell(
-                    encrypted,
-                    IV=init_vector,
-                    ctype=CellType.FINISHED
-                )))
-                print("Relayed the last packet for this communication")
-                break
-        print("Relay success.\n\n\n\n\n")
+                pack_size = util.RELAY_PACKET_SIZE_2
+            recv_cells = [
+                recv_bytes[i:i + pack_size]
+                for i in range(0, len(recv_bytes), pack_size)
+            ]
+
+            for recv_cell in recv_cells:
+                their_cell = pickle.loads(recv_cell)
+                print(their_cell.type)
+                if their_cell.type != CellType.FINISHED:
+                    # print("Got answer back.. as a relay.")
+                    encrypted, init_vector = util.aes_encryptor(
+                        client_reference["key"],
+                        Cell(their_cell, ctype=CellType.CONNECT_RESP)
+                    )
+                    out_pickle = pickle.dumps(Cell(
+                        encrypted, IV=init_vector, ctype=CellType.CONTINUE))
+                    client_reference["sock"].send(out_pickle)
+                    print(f"Relayed a packet, length {len(out_pickle)}.")
+                else:
+                    # print("Received the last packet.")
+                    encrypted, init_vector = util.aes_encryptor(
+                        client_reference["key"],
+                        Cell(their_cell, ctype=CellType.FINISHED)
+                    )
+                    out_pickle = pickle.dumps(Cell(
+                        encrypted, IV=init_vector, ctype=CellType.FINISHED))
+                    client_reference["sock"].send(out_pickle)
+                    print(f"Relayed last packet, length {len(out_pickle)}")
+                    print("Relay success.\n\n\n\n\n")
+                    return
 
     def run(self):
         """main method"""
