@@ -17,6 +17,18 @@
     display: block;
     font-size: 0.9em;
   }
+  span.online, span.offline {
+    width: 10px;
+    height: 10px;
+    display: inline-block;
+    border-radius: 50%;
+  }
+  span.online {
+    background-color: green;
+  }
+  span.offline {
+    background-color: red;
+  }
 </style>
 
 <template>
@@ -25,9 +37,10 @@
       <i class="fa fa-ellipsis-v" aria-hidden="true"></i>
     </div>
     <div id="options-menu" v-if="showMenu">
-      <h1>Online Relays</h1>
-      <span class="relay" v-for="relay in relays" :key="relay">
-        {{ relay }}
+      <h1>Relays</h1>
+      <span class="relay" v-for="relay in relays" :key="relay.address">
+        <span :class="relay.status"></span>
+        <b>{{ relay.address }}</b>
       </span>
     </div>
   </div>
@@ -46,6 +59,7 @@ export default {
       this.showMenu = !this.showMenu;
       if (this.showMenu) {
         this.activeClass = 'action-button active';
+        this.$store.dispatch('status/pingDirectoryStatus');
       } else {
         this.activeClass = 'action-button';
       }

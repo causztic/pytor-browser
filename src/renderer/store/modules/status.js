@@ -41,11 +41,43 @@ const actions = {
       dispatch('decrementDelay');
     });
   },
+  pingDirectoryStatus({ commit }) {
+    getDirectoryStatus().then((relays) => {
+      commit('updateRelays', relays);
+    });
+  },
 };
+
+const relayAddresses = relays => relays.map(relay => relay.address);
 
 const mutations = {
   setRelays(state, relays) {
-    state.relays = relays;
+    state.relays = relays.map((relay) => {
+      const updatedRelay = {};
+      updatedRelay.address = relay;
+      updatedRelay.status = 'online';
+      return updatedRelay;
+    });
+  },
+  updateRelays(state, relays) {
+    const tempRelays = state.relays.map((relay) => {
+      if (!relays.includes(relay.address)) {
+        relay.status = 'offline';
+      }
+      return relay;
+    });
+
+    // add new relays
+    relays.forEach((newRelay) => {
+      if (!relayAddresses(tempRelays).includes(newRelay)) {
+        const updatedRelay = {};
+        updatedRelay.address = newRelay;
+        updatedRelay.status = 'online';
+        tempRelays.push(newRelay);
+      }
+    });
+
+    state.relays = tempRelays;
   },
   connecting(state) {
     state.message = 'Connecting..';

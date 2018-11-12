@@ -47,8 +47,8 @@ class Client:
         sock.send(pickle.dumps(Cell("", ctype=CellType.GET_DIRECT)))
         received_cell = sock.recv(32768)
         received_cell = pickle.loads(received_cell)
-        if isinstance(received_cell.payload, list) and util.CLIENT_DEBUG:
-            print(received_cell.payload)
+        # if isinstance(received_cell.payload, list) and util.CLIENT_DEBUG:
+        #     print(received_cell.payload)
         return received_cell.payload
 
     @staticmethod
