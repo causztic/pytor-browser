@@ -38,7 +38,7 @@ class Relay():
     CLIENTS = []
     CLIENT_SOCKS = []
 
-    def __init__(self, port_number, identity=None):
+    def __init__(self, port_number, identity=None, directory_address=("127.0.0.1", 50000)):
         pem_file = os.path.join(
             os.path.dirname(__file__),
             "privates/privatetest" + str(identity) + ".pem"
@@ -71,8 +71,7 @@ class Relay():
 
         self.directory_socket = socket.socket(
             socket.AF_INET, socket.SOCK_STREAM)
-        self.directory_socket.connect(
-            (socket.gethostbyname(socket.gethostname()), 50000))
+        self.directory_socket.connect(directory_address)
         # connect to the directory server.
         self.directory_socket.send(pickle.dumps(directorycell))
 
@@ -439,28 +438,27 @@ def main():
     """Main function"""
     # sys.argv = input("you know the drill. \n")  # added for my debug
     # sys.argv = sys.argv.split()  # added for console debug
-    if len(sys.argv) == 2:  # was 2 -> 1
+    if len(sys.argv) == 2 or len(sys.argv) == 4:
         identity = None
-        port = sys.argv[1]  # was 1 -> 0
+        port = sys.argv[1]
         if port == "a":
             port = 45000
-            identity = 0
+            identity = "0"
         elif port == "b":
             port = 45001
-            identity = 1
+            identity = "1"
         elif port == "c":
             port = 45002
-            identity = 2
+            identity = "2"
 
+        if len(sys.argv) == 4:
+            relay = Relay(int(port), identity, (sys.argv[2], int(sys.argv[3])))
+        relay = Relay(int(port), identity)
     else:
-        print("Usage: python relay.py [port]")
+        print("Usage: python relay.py [port] (directory ip) (directory port)")
         return
-    relay = Relay(int(port), identity)
-    # identity might be None, so change to "None" if it is.
-    if not identity:
-        identity = "None"
-    print("Started relay on "+str(port) + "with identity " + identity)
 
+    print("Started relay on "+str(port) + " with identity " + str(identity))
     while True:
         relay.run()
 

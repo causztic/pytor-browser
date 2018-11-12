@@ -44,7 +44,7 @@ const spawnClientAndServers = () => {
       electron.ipcRenderer.send('pid-msg', client.pid);
 
       resolve();
-    }, 3000);
+    }, 1000);
   });
 };
 

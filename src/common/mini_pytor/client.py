@@ -23,8 +23,8 @@ from cell import Cell, CellType
 
 class Client:
     """Client class"""
-
-    def __init__(self):
+    def __init__(self, directory_address):
+        Client.directory_address = directory_address
         self.relay_list = []
         # generate RSA public private key pair
         self.private_key = rsa.generate_private_key(
@@ -41,7 +41,7 @@ class Client:
         """Method to obtain items from directory"""
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         # connect to directory
-        sock.connect((socket.gethostbyname(socket.gethostname()), 50000))
+        sock.connect(Client.directory_address)
         sock.send(pickle.dumps(Cell("", ctype=CellType.GET_DIRECT)))
         received_cell = sock.recv(32768)
         received_cell = pickle.loads(received_cell)
@@ -403,13 +403,15 @@ class Client:
               + "or no reply was obtained.", file=sys.stderr)
         return json.dumps({"content": "", "status": 404})
 
-
 class Responder(BaseHTTPRequestHandler):
     """Mini HTTP server"""
+    def __init__(self, directory_address, *args):
+        self.directory_address = directory_address
+        BaseHTTPRequestHandler.__init__(self, *args)
 
     def do_GET(self):
         """Get request response method"""
-        my_client = Client()
+        my_client = Client(self.directory_address)
         # Get references from directories.
         relay_list = Client.get_directory_items()
         relay_list = sample(relay_list, 3)
@@ -463,6 +465,14 @@ class Responder(BaseHTTPRequestHandler):
             return query["req"][0]
         return fallback
 
+class CustomHTTPServer:
+    """Custom HTTP Server instance to inject directory IP"""
+
+    def __init__(self, directory_address = ("127.0.0.1", 50000)):
+        def handler(*args):
+            Responder(directory_address, *args)
+        server = HTTPServer(('', 27182), handler)
+        server.serve_forever()
 
 class RelayData:
     """Relay data class"""
@@ -480,10 +490,12 @@ class RelayData:
 
 def main():
     """Main function"""
-    server_address = ('', 27182)
-    httpd = HTTPServer(server_address, Responder)
-    httpd.serve_forever()
-
+    if len(sys.argv) == 3:
+        CustomHTTPServer((sys.argv[1], int(sys.argv[2])))
+    elif len(sys.argv) == 2:
+        CustomHTTPServer((sys.argv[1], 50000))
+    else:
+        CustomHTTPServer()
 
 if __name__ == "__main__":
     main()
