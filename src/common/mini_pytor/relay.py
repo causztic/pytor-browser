@@ -289,7 +289,7 @@ class Relay():
                     # remove the bytes from the total bytes that have to be sent
                     del payload_bytes[:4096]
                     # slight delay for buffer issues
-                    time.sleep(0.003)
+                    time.sleep(0.0001)
 
                 # encrypt and send what is left.
                 encrypted, init_vector = util.aes_encryptor(
@@ -342,36 +342,47 @@ class Relay():
         sock.send(cell_to_next.payload)  # send over the cell
         while True:
             try:
-                recv_cell = sock.recv(32768)  # await answer
+                recv_bytes = sock.recv(util.RELAY_PACKET_SIZE_2 * 3)
+                if not recv_bytes:
+                    return
             except socket.timeout:
                 their_cell = "request timed out!"
-            their_cell = pickle.loads(recv_cell)
-            if util.RELAY_DEBUG:
-                print("================================================")
-                print(f"Received packet, length {len(recv_cell)}")
-                # print(f"Relay reply received type: {their_cell.type}")
-            if their_cell.type != CellType.FINISHED:
-                # print("Got answer back.. as a relay.")
-                encrypted, init_vector = util.aes_encryptor(
-                    client_reference["key"],
-                    Cell(their_cell, ctype=CellType.CONNECT_RESP)
-                )
-                out_pickle = pickle.dumps(Cell(
-                    encrypted, IV=init_vector, ctype=CellType.CONTINUE))
-                client_reference["sock"].send(out_pickle)
-                print(f"Relayed a packet, length {len(out_pickle)}.")
+            print("================================================")
+            print(f"Received packet, length {len(recv_bytes)}")
+            if len(recv_bytes) % util.RELAY_PACKET_SIZE_1 == 0:
+                pack_size = util.RELAY_PACKET_SIZE_1
             else:
-                # print("Received the last packet.")
-                encrypted, init_vector = util.aes_encryptor(
-                    client_reference["key"],
-                    Cell(their_cell, ctype=CellType.FINISHED)
-                )
-                out_pickle = pickle.dumps(Cell(
-                    encrypted, IV=init_vector, ctype=CellType.FINISHED))
-                client_reference["sock"].send(out_pickle)
-                print(f"Relayed last packet, length {len(out_pickle)}")
-                break
-        print("Relay success.\n\n\n\n\n")
+                pack_size = util.RELAY_PACKET_SIZE_2
+            recv_cells = [
+                recv_bytes[i:i + pack_size]
+                for i in range(0, len(recv_bytes), pack_size)
+            ]
+
+            for recv_cell in recv_cells:
+                their_cell = pickle.loads(recv_cell)
+                print(their_cell.type)
+                if their_cell.type != CellType.FINISHED:
+                    # print("Got answer back.. as a relay.")
+                    encrypted, init_vector = util.aes_encryptor(
+                        client_reference["key"],
+                        Cell(their_cell, ctype=CellType.CONNECT_RESP)
+                    )
+                    out_pickle = pickle.dumps(Cell(
+                        encrypted, IV=init_vector, ctype=CellType.CONTINUE))
+                    client_reference["sock"].send(out_pickle)
+                    print(f"Relayed a packet, length {len(out_pickle)}.")
+                else:
+                    # print("Received the last packet.")
+                    encrypted, init_vector = util.aes_encryptor(
+                        client_reference["key"],
+                        Cell(their_cell, ctype=CellType.FINISHED)
+                    )
+                    out_pickle = pickle.dumps(Cell(
+                        encrypted, IV=init_vector, ctype=CellType.FINISHED))
+                    client_reference["sock"].send(out_pickle)
+                    print(f"Relayed last packet, length {len(out_pickle)}")
+                    print("Relay success.\n\n\n\n\n")
+                    return
 
     def run(self):
         """main method"""

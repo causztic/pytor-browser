@@ -12,7 +12,9 @@ from cell import Cell
 
 RELAY_DEBUG = True
 CLIENT_DEBUG = True
-MAX_PACKET_SIZE = 4790
+RELAY_PACKET_SIZE_1 = 4406
+RELAY_PACKET_SIZE_2 = 4598
+CLIENT_PACKET_SIZE = 4790
 
 def padder128(data):
     """ pad ip to 256 bits... because this can vary too"""

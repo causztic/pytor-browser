@@ -304,13 +304,13 @@ class Client:
 
             if their_cell.type == CellType.CONTINUE:
                 if util.CLIENT_DEBUG:
-                    print("Information is being Streamed. ", file=sys.stderr)
+                    print("Information is being streamed. ", file=sys.stderr)
                 recv_bytes_arr = []
                 cont_loop = True
                 # get whole TCP stream and store it
                 while cont_loop:
-                    recv_bytes = sock.recv(util.MAX_PACKET_SIZE * 3)  # await answer
-                    if len(recv_bytes) < util.MAX_PACKET_SIZE:
+                    recv_bytes = sock.recv(util.CLIENT_PACKET_SIZE * 3)  # await answer
+                    if len(recv_bytes) < util.CLIENT_PACKET_SIZE:
                         cont_loop = False
                     recv_bytes_arr.append(recv_bytes)
                 total_payload = b"".join(recv_bytes_arr)
@@ -319,8 +319,8 @@ class Client:
                 # partition the entire payload to MAX_PACKET_SIZE each
                 # and process them accordingly
                 summation = [their_cell.payload]
-                for i in range(0, len(total_payload), util.MAX_PACKET_SIZE):
-                    recv_cell = total_payload[i:i + util.MAX_PACKET_SIZE]
+                for i in range(0, len(total_payload), util.CLIENT_PACKET_SIZE):
+                    recv_cell = total_payload[i:i + util.CLIENT_PACKET_SIZE]
                     their_cell = pickle.loads(recv_cell)
                     if util.CLIENT_DEBUG:
                         print(f"Received packet, length {len(recv_cell)}")
