@@ -212,7 +212,7 @@ class Client:
                 if util.CLIENT_DEBUG:
                     print("FAILED AT CONNECTION!", file=sys.stderr)
                 if their_cell.payload == "CONNECTIONREFUSED":
-                    print("Connection was refused. Is the relay online yet?")
+                    print("Connection was refused. Is the relay online yet?", file=sys.stderr)
                 return
 
             derived_key = self.check_signature_and_derive(
@@ -229,7 +229,7 @@ class Client:
             if connect_mode == 2:
                 del self.relay_list[0]  # remove it from the list
                 if util.CLIENT_DEBUG:
-                    print("REMOVED relay 0 DUE TO FAILED CONNECTION")
+                    print("REMOVED relay 0 DUE TO FAILED CONNECTION", file=sys.stderr)
 
     @staticmethod
     def req_wrapper(request, relay_list):
@@ -376,53 +376,57 @@ class Responder(BaseHTTPRequestHandler):
     def do_GET(self):
         """Get request response method"""
         my_client = Client()
-        # Get references from directories.
-        relay_list = Client.get_directory_items(self.directory_address)
-        relay_list = sample(relay_list, 3)
-        print(relay_list)
-        NUM_RELAYS = 3
-
-        for i in range(NUM_RELAYS):
-            relay = relay_list[i]
-            pubkey = serialization.load_pem_public_key(
-                relay["key"], backend=default_backend())
-            my_client.connect_relay(relay["ip_addr"], relay["port"], pubkey, i)
-            if util.CLIENT_DEBUG:
-                print(my_client.relay_list)
-
         if self.path == "/favicon.ico":
             return
-        path = Responder._handle_url(self.path)
-        print(f"URL: {path}")
-        obtained_response = my_client.req(path)
-        if isinstance(obtained_response, str):
-            print("Producing invalid reply")
+
+        url, node_order = Responder._handle_url(self.path)
+
+        if url is None or node_order is None:
+            print("Producing invalid reply", file=sys.stderr)
             self.send_response(404)
-            answer = obtained_response.encode()
+            answer = ""
             my_client.close()
         else:
-            print("Producing valid reply")
-            self.send_response(obtained_response.status_code)
-            my_client.close()
-            answer = bytes(obtained_response.content)
+            # Get references from directories.
+            relay_list = Client.get_directory_items(self.directory_address)
+            relay_list = sample(relay_list, 3)
+            print(relay_list)
+            NUM_RELAYS = 3
+
+            for i in range(NUM_RELAYS):
+                relay = relay_list[i]
+                pubkey = serialization.load_pem_public_key(
+                    relay["key"], backend=default_backend())
+                my_client.connect_relay(relay["ip_addr"], relay["port"], pubkey, i)
+                if util.CLIENT_DEBUG:
+                    print(my_client.relay_list)
+
+            print(f"URL: {url}")
+
+            obtained_response = my_client.req(url)
+            if isinstance(obtained_response, str):
+                print("Producing invalid reply", file=sys.stderr)
+                self.send_response(404)
+                answer = obtained_response.encode()
+                my_client.close()
+            else:
+                print("Producing valid reply")
+                self.send_response(obtained_response.status_code)
+                my_client.close()
+                answer = bytes(obtained_response.content)
         self.send_header('Content-type', 'text/html')
         self.end_headers()
         self.wfile.write(answer)
 
     @staticmethod
     def _handle_url(url_path):
-        fallback = "http://www.example.com"
         query = urllib.parse.parse_qs(url_path[2:])
-        if not query:
-            index1 = url_path.find("http://")
-            index2 = url_path.find("https://")
-            if index1 != -1:
-                return url_path[index1:]
-            if index2 != -1:
-                return url_path[index2:]
-        if "req" in query:
-            return query["req"][0]
-        return fallback
+        if "url" in query:
+            if "nodes" in query:
+                return query["url"][0], query["order"][0]
+            else:
+                return query["url"][0], "random"
+        return None, None
 
 
 class CustomHTTPServer:

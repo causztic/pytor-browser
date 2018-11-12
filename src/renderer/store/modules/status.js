@@ -33,10 +33,20 @@ const actions = {
     commit('connecting');
     getDirectoryStatus().then((relays) => {
       commit('setRelays', relays);
-      spawnClient().then(() => {
+      spawnClient().then((client) => {
         commit('connected');
+        client.stdout.on('data', (data) => {
+          console.log(`stdout: ${data}`);
+        });
+        // error encountered in the client.
+        // TODO: determine if client should restart.
+        client.stderr.on('data', (data) => {
+          commit('connectionFailed', data);
+          // dispatch('decrementDelay');
+        });
       });
     }).catch((message) => {
+      // error encountered when pinging the directory.
       commit('connectionFailed', message);
       dispatch('decrementDelay');
     });
