@@ -101,7 +101,7 @@ class Client:
                 print("Something went wrong.. Signature was invalid.",
                       file=sys.stderr)
             return None
-    
+
     def connect_relay(self, gonnect, gonnectport, rsa_key, connect_mode):
         """Wrapper function for easier use"""
         if connect_mode not in [0, 1, 2]:
@@ -319,7 +319,8 @@ class Client:
                     their_cell = Client.chain_decryptor(
                         intermediate_relays, their_cell)
                     summation.append(their_cell.payload)
-                resp = bytes(b"".join(summation))  # take the sum of all your bytes
+                # take the sum of all your bytes
+                resp = bytes(b"".join(summation))
                 resp = pickle.loads(resp)  # load the FINAL item.
                 return Client._check_response(resp)
 
@@ -411,6 +412,7 @@ class Responder(BaseHTTPRequestHandler):
             return query["req"][0]
         return fallback
 
+
 class RelayData:
     """Relay data class"""
 
@@ -430,6 +432,7 @@ def main():
     server_address = ('', 27182)
     httpd = HTTPServer(server_address, Responder)
     httpd.serve_forever()
+
 
 if __name__ == "__main__":
     main()
