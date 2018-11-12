@@ -344,13 +344,11 @@ class Client:
             # This check is unnecessary based off code though...
             # Left in in case of attack
             if util.CLIENT_DEBUG:
-                print(response.content)
-                print(response.status_code)
-            return_dict = {
-                "content": response.content.decode(response.encoding),
-                "status code": response.status_code
-            }
-            print(json.dumps(return_dict))
+                return_dict = {
+                    "content": response.content.decode(response.encoding),
+                    "status code": response.status_code
+                }
+                print(json.dumps(return_dict))
             return response
         # Reaching this branch implies data corruption of some form
         return Client.failure()
