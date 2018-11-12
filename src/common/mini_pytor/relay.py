@@ -15,6 +15,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric import rsa
 
 import util
 from cell import Cell, CellType
@@ -37,14 +38,22 @@ class Relay():
     CLIENTS = []
     CLIENT_SOCKS = []
 
-    def __init__(self, port_number, identity=None):
+    def __init__(self, port_number, identity=None, directory_address=("127.0.0.1", 50000)):
         pem_file = os.path.join(
             os.path.dirname(__file__),
             "privates/privatetest" + str(identity) + ".pem"
         )
-        temp_open = open(pem_file, "rb")
-        self.true_private_key = serialization.load_pem_private_key(
-            temp_open.read(), password=None, backend=default_backend())  # used for signing, etc.
+        if identity:  # if identity was provided
+            temp_open = open(pem_file, "rb")
+            self.true_private_key = serialization.load_pem_private_key(
+                temp_open.read(), password=None, backend=default_backend())
+
+        else:  # no provided identity. Generate a key.
+            self.true_private_key = rsa.generate_private_key(
+                backend=default_backend(),
+                public_exponent=65537,
+                key_size=4096
+            )
         self.sendingpublickey = self.true_private_key.public_key()
 
         serialised_public_key = self.sendingpublickey.public_bytes(
@@ -65,8 +74,7 @@ class Relay():
 
         self.directory_socket = socket.socket(
             socket.AF_INET, socket.SOCK_STREAM)
-        self.directory_socket.connect(
-            ("localhost", 50000))
+        self.directory_socket.connect(directory_address)
         # connect to the directory server.
         self.directory_socket.send(pickle.dumps(directory_cell))
 
@@ -432,25 +440,28 @@ class Relay():
 def main():
     """Main function"""
     # sys.argv = input("you know the drill. \n")  # added for my debug
-    if len(sys.argv) == 2:
-        identity = 3
-        port = sys.argv[1]  # was 1 -> 0
+    # sys.argv = sys.argv.split()  # added for console debug
+    if len(sys.argv) == 2 or len(sys.argv) == 4:
+        identity = None
+        port = sys.argv[1]
         if port == "a":
             port = 45000
-            identity = 0
+            identity = "0"
         elif port == "b":
             port = 45001
-            identity = 1
+            identity = "1"
         elif port == "c":
             port = 45002
-            identity = 2
+            identity = "2"
+
+        if len(sys.argv) == 4:
+            relay = Relay(int(port), identity, (sys.argv[2], int(sys.argv[3])))
+        relay = Relay(int(port), identity)
     else:
-        print("Usage: python relay.py [port]")
+        print("Usage: python relay.py [port] (directory ip) (directory port)")
         return
 
-    relay = Relay(int(port), identity)
-    print("Started relay on %d with identity %d" % (port, identity))
-
+    print("Started relay on "+str(port) + " with identity " + str(identity))
     while True:
         relay.run()
 

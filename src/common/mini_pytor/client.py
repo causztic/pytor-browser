@@ -6,6 +6,7 @@ import json
 import struct
 import socket
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from random import sample
 
 import urllib
 import requests
@@ -22,8 +23,8 @@ from cell import Cell, CellType
 
 class Client:
     """Client class"""
-
-    def __init__(self):
+    def __init__(self, directory_address):
+        Client.directory_address = directory_address
         self.relay_list = []
         # generate RSA public private key pair
         self.private_key = rsa.generate_private_key(
@@ -40,7 +41,7 @@ class Client:
         """Method to obtain items from directory"""
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         # connect to directory
-        sock.connect(("localhost", 50000))
+        sock.connect(Client.directory_address)
         sock.send(pickle.dumps(Cell("", ctype=CellType.GET_DIRECT)))
         received_cell = sock.recv(32768)
         received_cell = pickle.loads(received_cell)
@@ -288,7 +289,7 @@ class Client:
         try:
             sock = intermediate_relays[0].sock
             sock.send(pickle.dumps(sending_cell))
-            recv_cell = sock.recv(8192)
+            recv_cell = sock.recv(4790)
             their_cell = pickle.loads(recv_cell)
             if util.CLIENT_DEBUG:
                 print("received cell")
@@ -307,7 +308,7 @@ class Client:
                     print("Information is being Streamed. ", file=sys.stderr)
                 summation = [their_cell.payload]
                 while their_cell.type == CellType.CONTINUE:
-                    recv_cell = sock.recv(8192)  # await answer
+                    recv_cell = sock.recv(4790)  # await answer
                     # you now receive a cell with encrypted payload.
                     their_cell = pickle.loads(recv_cell)
                     if util.CLIENT_DEBUG:
@@ -359,15 +360,19 @@ class Client:
               + "or no reply was obtained.", file=sys.stderr)
         return json.dumps({"content": "", "status": 404})
 
-
 class Responder(BaseHTTPRequestHandler):
     """Mini HTTP server"""
+    def __init__(self, directory_address, *args):
+        self.directory_address = directory_address
+        BaseHTTPRequestHandler.__init__(self, *args)
 
     def do_GET(self):
         """Get request response method"""
-        my_client = Client()
+        my_client = Client(self.directory_address)
         # Get references from directories.
         relay_list = Client.get_directory_items()
+        relay_list = sample(relay_list, 3)
+        print(relay_list)
         NUM_RELAYS = 3
 
         for i in range(NUM_RELAYS):
@@ -412,6 +417,15 @@ class Responder(BaseHTTPRequestHandler):
             return query["req"][0]
         return fallback
 
+class CustomHTTPServer:
+    """Custom HTTP Server instance to inject directory IP"""
+
+    def __init__(self, directory_address=("127.0.0.1", 50000)):
+        def handler(*args):
+            """Override the default handler to pass in the address"""
+            Responder(directory_address, *args)
+        server = HTTPServer(('', 27182), handler)
+        server.serve_forever()
 
 class RelayData:
     """Relay data class"""
@@ -429,9 +443,12 @@ class RelayData:
 
 def main():
     """Main function"""
-    server_address = ('', 27182)
-    httpd = HTTPServer(server_address, Responder)
-    httpd.serve_forever()
+    if len(sys.argv) == 3:
+        CustomHTTPServer((sys.argv[1], int(sys.argv[2])))
+    elif len(sys.argv) == 2:
+        CustomHTTPServer((sys.argv[1], 50000))
+    else:
+        CustomHTTPServer()
 
 
 if __name__ == "__main__":

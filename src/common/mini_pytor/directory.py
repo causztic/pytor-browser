@@ -34,6 +34,7 @@ class DirectoryServer:
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         # now you have a signature of your own damned public key.
         # better be "" or it'll listen only on localhost
+        self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.socket.bind(("", 50000))
         self.socket.listen(100)
 
