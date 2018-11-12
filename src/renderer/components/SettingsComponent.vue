@@ -37,11 +37,15 @@
       <i class="fa fa-ellipsis-v" aria-hidden="true"></i>
     </div>
     <div id="options-menu" v-if="showMenu">
-      <h1>Relays</h1>
+      <h2>Relays</h2>
       <span class="relay" v-for="relay in relays" :key="relay.address">
         <span :class="relay.status"></span>
         <b>{{ relay.address }}</b>
       </span>
+      <h2>Connections</h2>
+      <select v-model="nodeCount">
+        <option v-for="count in relayCounts" :key="count">{{count}}</option>
+      </select>
     </div>
   </div>
 </template>
@@ -53,6 +57,12 @@ export default {
   name: 'SettingsComponent',
   computed: mapState({
     relays: state => state.status.relays,
+    relayCounts: (state) => {
+      if (state.status.relays.length <= 3) {
+        return [3];
+      }
+      return Array(state.status.relays.length - 2).fill().map((_, i) => i + 3);
+    },
   }),
   methods: {
     toggleMenu() {
@@ -71,10 +81,15 @@ export default {
       }
     },
   },
+  watch: {
+    nodeCount(newVal, _) {
+      this.$store.dispatch('query/setNodeCount', newVal);
+    },
+  },
   data() {
     return {
       showMenu: false,
-      nodeCount: 0,
+      nodeCount: 3,
       activeClass: 'action-button',
     };
   },

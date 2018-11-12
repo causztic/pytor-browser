@@ -107,8 +107,6 @@ class Client:
 
     def connect_relay(self, gonnect, gonnectport, rsa_key, connect_mode):
         """Wrapper function for easier use"""
-        if connect_mode not in [0, 1, 2]:
-            raise Exception("Connect mode invalid.")
         if connect_mode == 0:
             self.first_connect(gonnect, gonnectport, rsa_key)
         else:
@@ -379,23 +377,26 @@ class Responder(BaseHTTPRequestHandler):
         if self.path == "/favicon.ico":
             return
 
-        url, node_order = Responder._handle_url(self.path)
+        url, order, num_of_relays = Responder._handle_url(self.path)
 
-        if url is None or node_order is None:
+        if url is None or order is None:
             print("Producing invalid reply", file=sys.stderr)
             self.send_response(404)
             answer = ""
             my_client.close()
         else:
             # Get references from directories.
-            NUM_RELAYS = 3
 
             relay_list = Client.get_directory_items(self.directory_address)
-            if node_order == RANDOM_RELAY_ORDER:
-                relay_list = sample(relay_list, NUM_RELAYS)
+
+            if num_of_relays < 3 or num_of_relays > len(relay_list):
+                num_of_relays = 3
+
+            if order == RANDOM_RELAY_ORDER:
+                relay_list = sample(relay_list, num_of_relays)
 
             print(relay_list)
-            for i in range(NUM_RELAYS):
+            for i in range(num_of_relays):
                 relay = relay_list[i]
                 pubkey = serialization.load_pem_public_key(
                     relay["key"], backend=default_backend())
@@ -423,12 +424,18 @@ class Responder(BaseHTTPRequestHandler):
     @staticmethod
     def _handle_url(url_path):
         query = urllib.parse.parse_qs(url_path[2:])
+        count = 3
+        url = None
+        order = RANDOM_RELAY_ORDER
+
+        if "count" in query:
+            count = int(query["count"][0])
         if "url" in query:
-            if "nodes" in query:
-                return query["url"][0], query["order"][0]
-            else:
-                return query["url"][0], RANDOM_RELAY_ORDER
-        return None, None
+            url = query["url"][0]
+        if "order" in query:
+            order = query["order"][0]
+
+        return url, order, count
 
 
 class CustomHTTPServer:

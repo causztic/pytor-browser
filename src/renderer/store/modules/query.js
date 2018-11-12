@@ -3,6 +3,7 @@ const state = {
   history: [],
   actualURL: null,
   status: null,
+  nodeCount: 3,
 };
 
 // getters
@@ -25,6 +26,9 @@ const actions = {
       commit('addQueryToHistory', website);
     }
   },
+  setNodeCount({ commit }, nodeCount) {
+    commit('setNodeCount', nodeCount);
+  },
 };
 
 // mutations
@@ -33,7 +37,10 @@ const mutations = {
     state.history.push(website);
   },
   setActualURL(state, website) {
-    state.actualURL = `http://localhost:27182?url=${website}`;
+    state.actualURL = `http://localhost:27182?url=${website}&count=${state.nodeCount}`;
+  },
+  setNodeCount(state, nodeCount) {
+    state.nodeCount = nodeCount;
   },
 };
 
