@@ -323,6 +323,7 @@ class Client:
                     counter += 1
                 # take the sum of all your bytes
                 resp = bytes(b"".join(summation))
+                print(f"Total length: {len(resp)}")
                 resp = pickle.loads(resp)  # load the FINAL item.
                 return Client._check_response(resp)
 
