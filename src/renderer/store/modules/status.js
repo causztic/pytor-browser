@@ -1,13 +1,12 @@
 // eslint-disable-next-line import/no-unresolved
-import { seconds, spawnClientAndServers } from 'common/util';
-
-const electron = require('electron');
+import { seconds, spawnClient, getDirectoryStatus } from 'common/util';
 
 const state = {
+  realMessage: '',
   message: 'You are not connected to the network.',
   connected: false,
   connectionState: 'not_connected',
-  serverNodes: [],
+  relays: [],
   directoryQueryDelay: 1000,
   directoryQueryDelayCounter: 1000,
 };
@@ -24,25 +23,30 @@ const actions = {
     setTimeout(() => {
       commit('decrementDelay');
       if (state.directoryQueryDelayCounter === 0) {
-        dispatch('startServers');
+        dispatch('startProxy');
       } else {
         dispatch('decrementDelay');
       }
     }, 1000);
   },
-  startServers({ commit }) {
-    // TODO: check that directory and servers are up.
-    // find a better way to instantiate the servers
-    spawnClientAndServers().then(() => {
-      commit('connected');
-    }).catch(() => {
-      electron.ipcRenderer.send('clear-pids');
-      commit('decerementDelay');
+  startProxy({ commit, dispatch }) {
+    commit('connecting');
+    getDirectoryStatus().then((relays) => {
+      commit('setRelays', relays);
+      spawnClient().then(() => {
+        commit('connected');
+      });
+    }).catch((message) => {
+      commit('connectionFailed', message);
+      dispatch('decrementDelay');
     });
   },
 };
 
 const mutations = {
+  setRelays(state, relays) {
+    state.relays = relays;
+  },
   connecting(state) {
     state.message = 'Connecting..';
     state.connectionState = 'connecting';
@@ -57,16 +61,17 @@ const mutations = {
     state.connectionState = 'connected';
     state.connected = true;
   },
-  connectionFailed(state) {
+  connectionFailed(state, message) {
     state.directoryQueryDelay *= 2;
     state.directoryQueryDelayCounter = state.directoryQueryDelay;
-    state.message = `Failed to connect to Directory. Retry in ${seconds(state.directoryQueryDelayCounter)}..`;
+    state.realMessage = message;
+    state.message = `${message}. Retry in ${seconds(state.directoryQueryDelayCounter)}..`;
     state.connectionState = 'not-connected';
     state.connected = false;
   },
   decrementDelay(state) {
     state.directoryQueryDelayCounter -= 1000;
-    state.message = `Failed to connect to Directory. Retry in ${seconds(state.directoryQueryDelayCounter)}..`;
+    state.message = `${state.realMessage}. Retry in ${seconds(state.directoryQueryDelayCounter)}..`;
     state.connectionState = 'not-connected';
   },
 };

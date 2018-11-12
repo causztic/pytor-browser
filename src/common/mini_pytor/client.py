@@ -20,11 +20,11 @@ from cryptography.exceptions import InvalidSignature
 import util
 from cell import Cell, CellType
 
+DEFAULT_DIRECTORY_ADDRESS = ("127.0.0.1", 50000)
 
 class Client:
     """Client class"""
-    def __init__(self, directory_address):
-        Client.directory_address = directory_address
+    def __init__(self):
         self.relay_list = []
         # generate RSA public private key pair
         self.private_key = rsa.generate_private_key(
@@ -37,15 +37,15 @@ class Client:
         )
 
     @staticmethod
-    def get_directory_items():
+    def get_directory_items(directory_address=DEFAULT_DIRECTORY_ADDRESS):
         """Method to obtain items from directory"""
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         # connect to directory
-        sock.connect(Client.directory_address)
+        sock.connect(directory_address)
         sock.send(pickle.dumps(Cell("", ctype=CellType.GET_DIRECT)))
         received_cell = sock.recv(32768)
         received_cell = pickle.loads(received_cell)
-        if isinstance(received_cell.payload, list):
+        if isinstance(received_cell.payload, list) and util.CLIENT_DEBUG:
             print(received_cell.payload)
         return received_cell.payload
 
@@ -368,9 +368,9 @@ class Responder(BaseHTTPRequestHandler):
 
     def do_GET(self):
         """Get request response method"""
-        my_client = Client(self.directory_address)
+        my_client = Client()
         # Get references from directories.
-        relay_list = Client.get_directory_items()
+        relay_list = Client.get_directory_items(self.directory_address)
         relay_list = sample(relay_list, 3)
         print(relay_list)
         NUM_RELAYS = 3
@@ -420,7 +420,7 @@ class Responder(BaseHTTPRequestHandler):
 class CustomHTTPServer:
     """Custom HTTP Server instance to inject directory IP"""
 
-    def __init__(self, directory_address=("127.0.0.1", 50000)):
+    def __init__(self, directory_address=DEFAULT_DIRECTORY_ADDRESS):
         def handler(*args):
             """Override the default handler to pass in the address"""
             Responder(directory_address, *args)
