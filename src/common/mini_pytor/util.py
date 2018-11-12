@@ -11,7 +11,7 @@ from cryptography.hazmat.backends import default_backend
 from cell import Cell
 
 RELAY_DEBUG = True
-CLIENT_DEBUG = True
+CLIENT_DEBUG = False
 MAX_PACKET_SIZE = 4790
 
 def padder128(data):
