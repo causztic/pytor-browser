@@ -307,19 +307,20 @@ class Client:
                 if util.CLIENT_DEBUG:
                     print("Information is being Streamed. ", file=sys.stderr)
                 summation = [their_cell.payload]
+                counter = 0
                 while their_cell.type == CellType.CONTINUE:
                     recv_cell = sock.recv(4790)  # await answer
                     # you now receive a cell with encrypted payload.
                     their_cell = pickle.loads(recv_cell)
                     if util.CLIENT_DEBUG:
-                        print("received PART", file=sys.stderr)
-                        print(len(recv_cell), file=sys.stderr)
-                        print(recv_cell, file=sys.stderr)
-                        print("received cell payload", file=sys.stderr)
-                        print(their_cell.payload, file=sys.stderr)
+                        print(f"({counter}) Received packet, length {len(recv_cell)}")
+                        # print(recv_cell, file=sys.stderr)
+                        # print("Received cell payload", file=sys.stderr)
+                        # print(their_cell.payload, file=sys.stderr)
                     their_cell = Client.chain_decryptor(
                         intermediate_relays, their_cell)
                     summation.append(their_cell.payload)
+                    counter += 1
                 # take the sum of all your bytes
                 resp = bytes(b"".join(summation))
                 resp = pickle.loads(resp)  # load the FINAL item.
