@@ -274,8 +274,7 @@ class Relay():
                 print("Failed to receive response from website", file=sys.stderr)
 
             payload_bytes = pickle.dumps(req)
-            print(f"Total length: {len(payload_bytes)}")
-            counter = 0
+            total_length = len(payload_bytes)
             if len(payload_bytes) > 4096:
                 payload_bytes = bytearray(payload_bytes)
                 while len(payload_bytes) > 4096:
@@ -286,13 +285,11 @@ class Relay():
                     out_pickle = pickle.dumps(
                         Cell(encrypted, IV=init_vector, ctype=CellType.ADD_CON))
                     client_reference["sock"].send(out_pickle)
-                    print(f"({counter}) Sent one packet, "
-                          + f"length {len(out_pickle)}")
+                    print(f"Sent one packet, length {len(out_pickle)}")
                     # remove the bytes from the total bytes that have to be sent
                     del payload_bytes[:4096]
                     # slight delay for buffer issues
-                    counter += 1
-                    time.sleep(10 / 1000000)
+                    time.sleep(0.003)
 
                 # encrypt and send what is left.
                 encrypted, init_vector = util.aes_encryptor(
@@ -302,8 +299,7 @@ class Relay():
                 out_pickle = pickle.dumps(
                     Cell(encrypted, IV=init_vector, ctype=CellType.FINISHED))
                 client_reference["sock"].send(out_pickle)
-                print(f"({counter}) Sent last packet, "
-                      + f"length {len(out_pickle)}")
+                print(f"Sent last packet, length {len(out_pickle)}")
                 print("Finished sending valid replies.")
             else:
                 encrypted, init_vector = util.aes_encryptor(
@@ -313,10 +309,9 @@ class Relay():
                 out_pickle = pickle.dumps(
                     Cell(encrypted, IV=init_vector, ctype=CellType.FINISHED))
                 client_reference["sock"].send(out_pickle)
-                if util.RELAY_DEBUG:
-                    print(f"({counter}) Sent only packet, "
-                          + f"length {len(out_pickle)}")
+                print(f"Sent only packet, length {len(out_pickle)}")
                 print("Finished sending valid reply.")
+            print(f"Total length: {total_length}")
 
         else:
             encrypted, init_vector = util.aes_encryptor(
@@ -345,7 +340,6 @@ class Relay():
             print("\n\n")
 
         sock.send(cell_to_next.payload)  # send over the cell
-        counter = 0
         while True:
             try:
                 recv_cell = sock.recv(32768)  # await answer
@@ -354,8 +348,7 @@ class Relay():
             their_cell = pickle.loads(recv_cell)
             if util.RELAY_DEBUG:
                 print("================================================")
-                print(f"({counter}) Received packet, "
-                      + f"length {len(recv_cell)}")
+                print(f"Received packet, length {len(recv_cell)}")
                 # print(f"Relay reply received type: {their_cell.type}")
             if their_cell.type != CellType.FINISHED:
                 # print("Got answer back.. as a relay.")
@@ -366,8 +359,7 @@ class Relay():
                 out_pickle = pickle.dumps(Cell(
                     encrypted, IV=init_vector, ctype=CellType.CONTINUE))
                 client_reference["sock"].send(out_pickle)
-                print(f"({counter}) Relayed a packet, "
-                      + f"length {len(out_pickle)}.")
+                print(f"Relayed a packet, length {len(out_pickle)}.")
             else:
                 # print("Received the last packet.")
                 encrypted, init_vector = util.aes_encryptor(
@@ -377,10 +369,8 @@ class Relay():
                 out_pickle = pickle.dumps(Cell(
                     encrypted, IV=init_vector, ctype=CellType.FINISHED))
                 client_reference["sock"].send(out_pickle)
-                print(f"({counter}) Relayed last packet, "
-                      + f"length {len(out_pickle)}")
+                print(f"Relayed last packet, length {len(out_pickle)}")
                 break
-            counter += 1
         print("Relay success.\n\n\n\n\n")
 
     def run(self):

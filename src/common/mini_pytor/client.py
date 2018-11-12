@@ -306,24 +306,33 @@ class Client:
             if their_cell.type == CellType.CONTINUE:
                 if util.CLIENT_DEBUG:
                     print("Information is being Streamed. ", file=sys.stderr)
+                recv_bytes_arr = []
+                cont_loop = True
+                # get whole TCP stream and store it
+                while cont_loop:
+                    recv_bytes = sock.recv(util.MAX_PACKET_SIZE * 3)  # await answer
+                    if len(recv_bytes) < util.MAX_PACKET_SIZE:
+                        cont_loop = False
+                    recv_bytes_arr.append(recv_bytes)
+                total_payload = b"".join(recv_bytes_arr)
+                if util.CLIENT_DEBUG:
+                    print(f"Total length: {len(total_payload)}")
+                # partition the entire payload to MAX_PACKET_SIZE each
+                # and process them accordingly
                 summation = [their_cell.payload]
-                counter = 0
-                while their_cell.type == CellType.CONTINUE:
-                    recv_cell = sock.recv(4790)  # await answer
-                    # you now receive a cell with encrypted payload.
+                for i in range(0, len(total_payload), util.MAX_PACKET_SIZE):
+                    recv_cell = total_payload[i:i + util.MAX_PACKET_SIZE]
                     their_cell = pickle.loads(recv_cell)
                     if util.CLIENT_DEBUG:
-                        print(f"({counter}) Received packet, length {len(recv_cell)}")
+                        print(f"Received packet, length {len(recv_cell)}")
                         # print(recv_cell, file=sys.stderr)
                         # print("Received cell payload", file=sys.stderr)
                         # print(their_cell.payload, file=sys.stderr)
                     their_cell = Client.chain_decryptor(
                         intermediate_relays, their_cell)
                     summation.append(their_cell.payload)
-                    counter += 1
                 # take the sum of all your bytes
                 resp = bytes(b"".join(summation))
-                print(f"Total length: {len(resp)}")
                 resp = pickle.loads(resp)  # load the FINAL item.
                 return Client._check_response(resp)
 
