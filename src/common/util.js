@@ -50,9 +50,7 @@ const spawnClientAndServers = () => {
 
 const getDirectoryStatus = () => {
   const directory = spawn('python', ['./mini_pytor/console.py', 'directory'], { cwd: __dirname });
-  directory.stdout.on('data', (data) => {
-    console.log(`stdout: ${data}`);
-  });
+  setUpListeners(directory);
 };
 
 // convert milliseconds to seconds in string
