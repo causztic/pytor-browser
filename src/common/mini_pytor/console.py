@@ -18,7 +18,7 @@ def main():
 			sys.stderr.write("No nodes currently available.")
 
 		for datum in results:
-			print(datum["ip_addr"], datum["port"])
+			print(datum["ip_addr"] + ":" + str(datum["port"]))
 	except ConnectionRefusedError:
 		sys.stderr.write("Directory offline.")
 

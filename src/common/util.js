@@ -1,6 +1,7 @@
 import { spawn } from 'child_process';
 
 const electron = require('electron');
+const readline = require('readline');
 
 const isDevelopment = process.env.NODE_ENV !== 'production';
 // eslint-disable-next-line no-undef
@@ -42,10 +43,14 @@ const getDirectoryStatus = () => new Promise((resolve, reject) => {
     console.log(`stderr: ${data}`);
     reject(data);
   });
-  directory.stdout.on('data', (data) => {
-    console.log(`stdout: ${data}`);
-    relays.push(data);
+
+  readline.createInterface({
+    input: directory.stdout,
+    terminal: false,
+  }).on('line', (line) => {
+    relays.push(line);
   });
+
   directory.on('close', (code) => {
     console.log(`child process exited with code ${code}`);
     resolve(relays);

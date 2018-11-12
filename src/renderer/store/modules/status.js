@@ -6,7 +6,7 @@ const state = {
   message: 'You are not connected to the network.',
   connected: false,
   connectionState: 'not_connected',
-  serverNodes: [],
+  relays: [],
   directoryQueryDelay: 1000,
   directoryQueryDelayCounter: 1000,
 };
@@ -32,7 +32,7 @@ const actions = {
   startProxy({ commit, dispatch }) {
     commit('connecting');
     getDirectoryStatus().then((relays) => {
-      console.log(relays);
+      commit('setRelays', relays);
       spawnClient().then(() => {
         commit('connected');
       });
@@ -44,6 +44,9 @@ const actions = {
 };
 
 const mutations = {
+  setRelays(state, relays) {
+    state.relays = relays;
+  },
   connecting(state) {
     state.message = 'Connecting..';
     state.connectionState = 'connecting';
