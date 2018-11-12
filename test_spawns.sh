@@ -2,8 +2,7 @@
 IDS=()
 
 finish() {
-  sudo kill $(jobs -p)
-  kill 0;
+  kill $(jobs -p)
   rm .pytor_lock
   exit;
 }
