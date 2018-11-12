@@ -13,6 +13,10 @@
     box-shadow: 5px 5px 25px 5px #efefef;
     font-family: "system-ui";
   }
+  .relay {
+    display: block;
+    font-size: 0.9em;
+  }
 </style>
 
 <template>
@@ -21,20 +25,22 @@
       <i class="fa fa-ellipsis-v" aria-hidden="true"></i>
     </div>
     <div id="options-menu" v-if="showMenu">
+      <h1>Online Relays</h1>
+      <span class="relay" v-for="relay in relays" :key="relay">
+        {{ relay }}
+      </span>
     </div>
   </div>
 </template>
 
 <script>
+import { mapState } from 'vuex';
+
 export default {
   name: 'SettingsComponent',
-  data() {
-    return {
-      showMenu: false,
-      nodeCount: 0,
-      activeClass: 'action-button',
-    };
-  },
+  computed: mapState({
+    relays: state => state.status.relays,
+  }),
   methods: {
     toggleMenu() {
       this.showMenu = !this.showMenu;
@@ -50,6 +56,13 @@ export default {
         this.showMenu = false;
       }
     },
+  },
+  data() {
+    return {
+      showMenu: false,
+      nodeCount: 0,
+      activeClass: 'action-button',
+    };
   },
 };
 </script>

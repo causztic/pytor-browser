@@ -81,6 +81,7 @@ class Relay():
 
         # begin listening for clientele.
         self.relay_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.relay_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.relay_socket.bind(("", port_number))
         self.relay_socket.listen(100)
 

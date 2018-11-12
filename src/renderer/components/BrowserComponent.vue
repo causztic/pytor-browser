@@ -56,7 +56,7 @@ export default {
     },
   },
   created() {
-    this.$store.dispatch('status/startServers');
+    this.$store.dispatch('status/startProxy');
   },
 };
 </script>
