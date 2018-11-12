@@ -22,36 +22,30 @@ const setUpListeners = (instance) => {
   });
 };
 
-const spawnClientAndServers = () => {
-  const directory = spawn('python', ['./mini_pytor/directory.py'], { cwd: __dirname });
-  setUpListeners(directory);
-  electron.ipcRenderer.send('pid-msg', directory.pid);
+const spawnClient = () => new Promise((resolve, _) => {
+  setTimeout(() => {
+    const client = spawn(
+      'python',
+      ['./mini_pytor/client.py'],
+      { cwd: __dirname },
+    );
+    setUpListeners(client);
+    electron.ipcRenderer.send('pid-msg', client.pid);
+    resolve();
+  }, 500);
+});
 
-  return new Promise((resolve, _) => {
-    setTimeout(() => {
-      ['a', 'b', 'c'].forEach((instance) => {
-        const serverInstance = spawn('python', ['./mini_pytor/relay.py', instance], { cwd: __dirname });
-        setUpListeners(serverInstance);
-        electron.ipcRenderer.send('pid-msg', serverInstance.pid);
-      });
-
-      const client = spawn(
-        'python',
-        ['./mini_pytor/client.py'],
-        { cwd: __dirname },
-      );
-      setUpListeners(client);
-      electron.ipcRenderer.send('pid-msg', client.pid);
-
-      resolve();
-    }, 1000);
-  });
-};
-
-const getDirectoryStatus = () => {
+const getDirectoryStatus = () => new Promise((resolve, reject) => {
   const directory = spawn('python', ['./mini_pytor/console.py', 'directory'], { cwd: __dirname });
-  setUpListeners(directory);
-};
+  directory.stderr.on('data', (data) => {
+    console.log(`stderr: ${data}`);
+    reject(data);
+  });
+  directory.on('close', (code) => {
+    console.log(`child process exited with code ${code}`);
+    resolve();
+  });
+});
 
 // convert milliseconds to seconds in string
 const seconds = (milliseconds) => {
@@ -62,5 +56,5 @@ const seconds = (milliseconds) => {
 };
 
 export {
-  isDevelopment, staticPath, spawnClientAndServers, seconds, getDirectoryStatus,
+  isDevelopment, staticPath, spawnClient, seconds, getDirectoryStatus,
 };

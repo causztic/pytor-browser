@@ -1,5 +1,5 @@
 // eslint-disable-next-line import/no-unresolved
-import { seconds, spawnClientAndServers, getDirectoryStatus } from 'common/util';
+import { seconds, spawnClient, getDirectoryStatus } from 'common/util';
 
 const electron = require('electron');
 
@@ -24,20 +24,18 @@ const actions = {
     setTimeout(() => {
       commit('decrementDelay');
       if (state.directoryQueryDelayCounter === 0) {
-        dispatch('startServers');
+        dispatch('startProxy');
       } else {
         dispatch('decrementDelay');
       }
     }, 1000);
   },
-  startServers({ commit }) {
-    // TODO: check that directory and servers are up.
-    // find a better way to instantiate the servers
-    spawnClientAndServers().then(() => {
-      getDirectoryStatus();
-      commit('connected');
+  startProxy({ commit }) {
+    getDirectoryStatus().then(() => {
+      spawnClient().then(() => {
+        commit('connected');
+      });
     }).catch(() => {
-      electron.ipcRenderer.send('clear-pids');
       commit('decerementDelay');
     });
   },
