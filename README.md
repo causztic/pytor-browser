@@ -25,21 +25,18 @@ python -m pip install cryptography requests
 ## Running
 
 ```sh
+sudo chmod +x test_spawns.sh
+sudo ./test_spawns.sh
 yarn dev
 ```
 
 ## Details
 
-After setting up and running `yarn dev`, a simple web browser will appear.
-Along with this web browser GUI, 1 client and 3 node instances will be started.
-This is done using NodeJS' `spawn` and is equivalent to running the commands below.
+After setting up and running `yarn dev`, a simple web browser will appear. It starts **Client**, which is essentially a proxy server which will process the requests in place of the normal HTTP servers. 
 
-```sh
-python server.py a
-python server.py b
-python server.py c
-python client.py localhost 45000 0 localhost 45001 1 localhost 45002 2 https://motherfuckingwebsite.com/
-```
+**Client** starts with the default URL of `localhost:27182`.
+
+`test_spawns.sh` will spawn 1 **Directory** and 3 **Relays**.
 
 Behind the scenes, this is what happens:
 
