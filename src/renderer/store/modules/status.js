@@ -31,7 +31,8 @@ const actions = {
   },
   startProxy({ commit, dispatch }) {
     commit('connecting');
-    getDirectoryStatus().then(() => {
+    getDirectoryStatus().then((relays) => {
+      console.log(relays);
       spawnClient().then(() => {
         commit('connected');
       });

@@ -37,13 +37,18 @@ const spawnClient = () => new Promise((resolve, _) => {
 
 const getDirectoryStatus = () => new Promise((resolve, reject) => {
   const directory = spawn('python', ['./mini_pytor/console.py', 'directory'], { cwd: __dirname });
+  const relays = [];
   directory.stderr.on('data', (data) => {
     console.log(`stderr: ${data}`);
     reject(data);
   });
+  directory.stdout.on('data', (data) => {
+    console.log(`stdout: ${data}`);
+    relays.push(data);
+  });
   directory.on('close', (code) => {
     console.log(`child process exited with code ${code}`);
-    resolve();
+    resolve(relays);
   });
 });
 
