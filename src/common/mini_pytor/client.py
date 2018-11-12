@@ -468,8 +468,9 @@ class Responder(BaseHTTPRequestHandler):
 class CustomHTTPServer:
     """Custom HTTP Server instance to inject directory IP"""
 
-    def __init__(self, directory_address = ("127.0.0.1", 50000)):
+    def __init__(self, directory_address=("127.0.0.1", 50000)):
         def handler(*args):
+            """Override the default handler to pass in the address"""
             Responder(directory_address, *args)
         server = HTTPServer(('', 27182), handler)
         server.serve_forever()
