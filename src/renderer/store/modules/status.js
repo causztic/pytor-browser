@@ -1,9 +1,8 @@
 // eslint-disable-next-line import/no-unresolved
 import { seconds, spawnClient, getDirectoryStatus } from 'common/util';
 
-const electron = require('electron');
-
 const state = {
+  realMessage: '',
   message: 'You are not connected to the network.',
   connected: false,
   connectionState: 'not_connected',
@@ -30,13 +29,15 @@ const actions = {
       }
     }, 1000);
   },
-  startProxy({ commit }) {
+  startProxy({ commit, dispatch }) {
+    commit('connecting');
     getDirectoryStatus().then(() => {
       spawnClient().then(() => {
         commit('connected');
       });
-    }).catch(() => {
-      commit('decerementDelay');
+    }).catch((message) => {
+      commit('connectionFailed', message);
+      dispatch('decrementDelay');
     });
   },
 };
@@ -56,16 +57,17 @@ const mutations = {
     state.connectionState = 'connected';
     state.connected = true;
   },
-  connectionFailed(state) {
+  connectionFailed(state, message) {
     state.directoryQueryDelay *= 2;
     state.directoryQueryDelayCounter = state.directoryQueryDelay;
-    state.message = `Failed to connect to Directory. Retry in ${seconds(state.directoryQueryDelayCounter)}..`;
+    state.realMessage = message;
+    state.message = `${message}. Retry in ${seconds(state.directoryQueryDelayCounter)}..`;
     state.connectionState = 'not-connected';
     state.connected = false;
   },
   decrementDelay(state) {
     state.directoryQueryDelayCounter -= 1000;
-    state.message = `Failed to connect to Directory. Retry in ${seconds(state.directoryQueryDelayCounter)}..`;
+    state.message = `${state.realMessage}. Retry in ${seconds(state.directoryQueryDelayCounter)}..`;
     state.connectionState = 'not-connected';
   },
 };
