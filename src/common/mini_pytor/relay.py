@@ -471,6 +471,13 @@ def main():
         elif port == "c":
             port = 45002
             identity = "2"
+        elif port == "d":
+            port = 45003
+            identity = "3"
+        elif port == "e":
+            port = 45004
+            identity = "4"
+
 
         if len(sys.argv) == 4:
             relay = Relay(int(port), identity, (sys.argv[2], int(sys.argv[3])))

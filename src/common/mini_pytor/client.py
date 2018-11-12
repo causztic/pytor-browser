@@ -21,7 +21,7 @@ import util
 from cell import Cell, CellType
 
 DEFAULT_DIRECTORY_ADDRESS = ("127.0.0.1", 50000)
-
+RANDOM_RELAY_ORDER = "random"
 
 class Client:
     """Client class"""
@@ -388,11 +388,13 @@ class Responder(BaseHTTPRequestHandler):
             my_client.close()
         else:
             # Get references from directories.
-            relay_list = Client.get_directory_items(self.directory_address)
-            relay_list = sample(relay_list, 3)
-            print(relay_list)
             NUM_RELAYS = 3
 
+            relay_list = Client.get_directory_items(self.directory_address)
+            if node_order == RANDOM_RELAY_ORDER:
+                relay_list = sample(relay_list, NUM_RELAYS)
+
+            print(relay_list)
             for i in range(NUM_RELAYS):
                 relay = relay_list[i]
                 pubkey = serialization.load_pem_public_key(
@@ -425,7 +427,7 @@ class Responder(BaseHTTPRequestHandler):
             if "nodes" in query:
                 return query["url"][0], query["order"][0]
             else:
-                return query["url"][0], "random"
+                return query["url"][0], RANDOM_RELAY_ORDER
         return None, None
 
 
