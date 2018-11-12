@@ -304,7 +304,7 @@ class Client:
 
             if their_cell.type == CellType.CONTINUE:
                 if util.CLIENT_DEBUG:
-                    print("Information is being streamed. ", file=sys.stderr)
+                    print("Information is being streamed.")
                 recv_bytes_arr = []
                 cont_loop = True
                 # get whole TCP stream and store it
@@ -324,9 +324,6 @@ class Client:
                     their_cell = pickle.loads(recv_cell)
                     if util.CLIENT_DEBUG:
                         print(f"Received packet, length {len(recv_cell)}")
-                        # print(recv_cell, file=sys.stderr)
-                        # print("Received cell payload", file=sys.stderr)
-                        # print(their_cell.payload, file=sys.stderr)
                     their_cell = Client.chain_decryptor(
                         intermediate_relays, their_cell)
                     summation.append(their_cell.payload)
