@@ -1,5 +1,5 @@
 // eslint-disable-next-line import/no-unresolved
-import { seconds, spawnClientAndServers } from 'common/util';
+import { seconds, spawnClientAndServers, getDirectoryStatus } from 'common/util';
 
 const electron = require('electron');
 
@@ -34,6 +34,7 @@ const actions = {
     // TODO: check that directory and servers are up.
     // find a better way to instantiate the servers
     spawnClientAndServers().then(() => {
+      getDirectoryStatus();
       commit('connected');
     }).catch(() => {
       electron.ipcRenderer.send('clear-pids');
