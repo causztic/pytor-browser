@@ -30,9 +30,8 @@ class DirectoryServer:
         self.registered_relays = []
         self.relay_sockets = []
         self.connected_relays = []
-        # tcp type chosen for first.
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        # now you have a signature of your own damned public key.
+        # now you have a signature of your own public key.
         # better be "" or it'll listen only on localhost
         self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.socket.bind(("", 50000))
@@ -41,9 +40,7 @@ class DirectoryServer:
     def handle_conn(self):
         """Handle an incoming connection to the server."""
         print("Got a connection request.")
-        print(self.registered_relays)
         relay_socket, _ = self.socket.accept()
-        # obtain the data sent over.
         obtained = relay_socket.recv(4096)
         try:
             received_cell = pickle.loads(obtained)
@@ -51,7 +48,6 @@ class DirectoryServer:
             relay_socket.close()
             return
 
-        # ensure it is indeed a cell.
         if not isinstance(received_cell, Cell):
             relay_socket.close()
             return
@@ -66,20 +62,21 @@ class DirectoryServer:
             try:
                 util.rsa_verify(their_pubkey, signature, base_bytearray)
             except InvalidSignature:
-                # Reject connection. Signature validation failed.
+                # reject connection, signature validation failed
                 relay_socket.close()
                 return
 
             # obtain the ip and port of that server.
             ip_address, _ = relay_socket.getpeername()
-            print("Added-> PORT: " + str(port_num) + " IP: " + str(ip_address))
             relay_data = {
                 "ip_addr": ip_address,
                 "port": port_num,
                 "key": their_pubkey,
                 "sock":  relay_socket
             }
-            self.connected_relays.append(relay_data)
+            if relay_data not in self.connected_relays:
+                self.connected_relays.append(relay_data)
+
             registered_relay_data = {
                 "ip_addr": ip_address,
                 "port": port_num,
@@ -87,7 +84,10 @@ class DirectoryServer:
             }
             if registered_relay_data not in self.registered_relays:
                 self.registered_relays.append(registered_relay_data)
+            if relay_socket not in self.relay_sockets:
                 self.relay_sockets.append(relay_socket)
+            print(f"Added -> ({str(ip_address)}, {str(port_num)})")
+            print(self.registered_relays, end="\n\n")
         elif received_cell.type == CellType.GET_DIRECT:
             print("Got a directory request")
             relay_socket.settimeout(0.03)  # ensure we don't block forever
@@ -96,16 +96,16 @@ class DirectoryServer:
             relay_socket.recv(4096)
             relay_socket.close()
         else:
-            relay_socket.close()
             # reject connection as it does not contain a valid cell.
+            relay_socket.close()
 
     def handle_closed_conn(self, provided_socket):
         """Handle a closed connection"""
         reference = None
         reference2 = None
         try:
-            provided_socket.recv(4096)
-        except (ConnectionResetError, ConnectionError) as _:
+            provided_socket.send(b"Hello")
+        except (ConnectionResetError, ConnectionError):
             # search for the socket, as it must be part of both lists.
             for k in self.connected_relays:
                 if k["sock"] == provided_socket:
@@ -116,27 +116,26 @@ class DirectoryServer:
                         and k["port"] == reference["port"]:
                     reference2 = k
 
-            print("relay WAS closed! or timed out.")
-            print("Removed relay with IP: " + str(reference["ip_addr"])
-                  + " Port: " + str(reference["port"]))
-
-            provided_socket.close()
-            print("closed connection to relay.")
             self.connected_relays.remove(reference)
             self.registered_relays.remove(reference2)
             self.relay_sockets.remove(provided_socket)
+            print(f"Removed relay ({str(reference['ip_addr'])}, "
+                  + f"{str(reference['port'])}): Socket closed or timed-out")
+            print(self.registered_relays, end="\n\n")
+            provided_socket.close()
 
     def run(self):
         """Start up directory"""
         while True:
-            readready, _, _ = select.select(
+            read_ready, _, _ = select.select(
                 [self.socket] + self.relay_sockets, [], [])
-            for i in readready:
+            for i in read_ready:
                 if i == self.socket:  # is receiving a new connection request.
                     self.handle_conn()
                 else:
                     self.handle_closed_conn(i)
 
 
-DIRECTORY = DirectoryServer()
-DIRECTORY.run()
+if __name__ == "__main__":
+    DIRECTORY = DirectoryServer()
+    DIRECTORY.run()

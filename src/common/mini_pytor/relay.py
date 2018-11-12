@@ -154,11 +154,11 @@ class Relay():
             obtained_cell = self.rsa_decrypt(obtained_cell)
 
         except ValueError:  # decryption failure
-            print("Rejected one connection", file=sys.stderr)
+            print("Decryption failed", file=sys.stderr)
             return None
 
         if util.RELAY_DEBUG:
-            print("Decrypted cell with actual keys.")
+            print("Decrypted cell with actual keys")
             print(obtained_cell)
 
         obtained_cell = pickle.loads(obtained_cell)
@@ -271,7 +271,8 @@ class Relay():
                 print("Length of answer: " + str(len(req.content)))
             except requests.exceptions.ConnectionError:
                 req = "ERROR"
-                print("Failed to receive response from website", file=sys.stderr)
+                print("Failed to receive response from website",
+                      file=sys.stderr)
 
             payload_bytes = pickle.dumps(req)
             total_length = len(payload_bytes)
@@ -450,7 +451,8 @@ class Relay():
                 elif cell_to_next.type == CellType.REQ:
                     self.request_processing(sending_client, cell_to_next)
                 else:
-                    raise Exception("Invalid cell type in relay run().")
+                    print("Invalid cell type in relay run().",
+                          file=sys.stderr)
 
 
 def main():
@@ -479,7 +481,12 @@ def main():
 
     print("Started relay on "+str(port) + " with identity " + str(identity))
     while True:
-        relay.run()
+        try:
+            relay.run()
+        except KeyboardInterrupt:
+            if relay.relay_socket:
+                relay.relay_socket.close()
+            break
 
 
 if __name__ == "__main__":

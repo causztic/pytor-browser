@@ -22,8 +22,10 @@ from cell import Cell, CellType
 
 DEFAULT_DIRECTORY_ADDRESS = ("127.0.0.1", 50000)
 
+
 class Client:
     """Client class"""
+
     def __init__(self):
         self.relay_list = []
         # generate RSA public private key pair
@@ -220,11 +222,10 @@ class Client:
 
             if util.CLIENT_DEBUG:
                 print("Connected successfully to relay @ " + gonnect
-                      + "   Port: " + str(gonnectport), file=sys.stderr)
+                      + "   Port: " + str(gonnectport))
 
         except (ConnectionResetError, ConnectionRefusedError, struct.error):
-            if util.CLIENT_DEBUG:
-                print("Socket error.", file=sys.stderr)
+            print("Socket error.", file=sys.stderr)
             if connect_mode == 2:
                 del self.relay_list[0]  # remove it from the list
                 if util.CLIENT_DEBUG:
@@ -234,7 +235,6 @@ class Client:
     def req_wrapper(request, relay_list):
         """Generate a encrypted cell for sending that contains the request"""
         sending_cell = Cell(request, ctype=CellType.REQ)
-        # generate True payload
         encrypted_cell, init_vector = util.aes_encryptor(
             relay_list[2].key, sending_cell)
         sending_cell = Cell(encrypted_cell, IV=init_vector,
@@ -261,8 +261,7 @@ class Client:
 
     @staticmethod
     def chain_decryptor(list_of_intermediate_relays, provided_cell):
-        """Decrypt something given a list the intermediate relay list
-        and the cell"""
+        """Decrypt the provided cell given a list of intermediate relays"""
         counter = 0
         while counter < len(list_of_intermediate_relays):
             decrypted = util.aes_decryptor(
@@ -309,7 +308,8 @@ class Client:
                 cont_loop = True
                 # get whole TCP stream and store it
                 while cont_loop:
-                    recv_bytes = sock.recv(util.CLIENT_PACKET_SIZE * 3)  # await answer
+                    recv_bytes = sock.recv(
+                        util.CLIENT_PACKET_SIZE * 3)  # await answer
                     if len(recv_bytes) < util.CLIENT_PACKET_SIZE:
                         cont_loop = False
                     recv_bytes_arr.append(recv_bytes)
@@ -344,8 +344,8 @@ class Client:
             # This check is unnecessary based off code though...
             # Left in in case of attack
             if util.CLIENT_DEBUG:
-                print(response.content, file=sys.stderr)
-                print(response.status_code, file=sys.stderr)
+                print(response.content)
+                print(response.status_code)
             return_dict = {
                 "content": response.content.decode(response.encoding),
                 "status code": response.status_code
@@ -367,8 +367,10 @@ class Client:
               + "or no reply was obtained.", file=sys.stderr)
         return json.dumps({"content": "", "status": 404})
 
+
 class Responder(BaseHTTPRequestHandler):
     """Mini HTTP server"""
+
     def __init__(self, directory_address, *args):
         self.directory_address = directory_address
         BaseHTTPRequestHandler.__init__(self, *args)
@@ -393,7 +395,7 @@ class Responder(BaseHTTPRequestHandler):
         if self.path == "/favicon.ico":
             return
         path = Responder._handle_url(self.path)
-        print(path)
+        print(f"URL: {path}")
         obtained_response = my_client.req(path)
         if isinstance(obtained_response, str):
             print("Producing invalid reply")
@@ -411,7 +413,7 @@ class Responder(BaseHTTPRequestHandler):
 
     @staticmethod
     def _handle_url(url_path):
-        fallback = "http://www.motherfuckingwebsite.com"
+        fallback = "http://www.example.com"
         query = urllib.parse.parse_qs(url_path[2:])
         if not query:
             index1 = url_path.find("http://")
@@ -424,6 +426,7 @@ class Responder(BaseHTTPRequestHandler):
             return query["req"][0]
         return fallback
 
+
 class CustomHTTPServer:
     """Custom HTTP Server instance to inject directory IP"""
 
@@ -433,6 +436,7 @@ class CustomHTTPServer:
             Responder(directory_address, *args)
         server = HTTPServer(('', 27182), handler)
         server.serve_forever()
+
 
 class RelayData:
     """Relay data class"""
