@@ -64,8 +64,11 @@ class Relay():
         # generate random bytearray with 128 bytes.
         signedbytearray = self.sign(base_bytearray)
 
-        directorycell = Cell(serialised_public_key, signature=signedbytearray,
-                             salt=base_bytearray, IV=port_number, ctype=CellType.GIVE_DIRECT)
+        directory_cell = Cell(serialised_public_key,
+                              signature=signedbytearray,
+                              salt=base_bytearray,
+                              IV=port_number,
+                              ctype=CellType.GIVE_DIRECT)
         # store the byte array, signed version, serialised public key,
         # and actual port number for sending.
 
@@ -73,7 +76,7 @@ class Relay():
             socket.AF_INET, socket.SOCK_STREAM)
         self.directory_socket.connect(directory_address)
         # connect to the directory server.
-        self.directory_socket.send(pickle.dumps(directorycell))
+        self.directory_socket.send(pickle.dumps(directory_cell))
 
         # begin listening for clientele.
         self.relay_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
