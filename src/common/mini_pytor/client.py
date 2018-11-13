@@ -75,7 +75,7 @@ class Client:
                 label=None
             )
         )
-        # return my generated ecdhe key and the encrypted cell
+        # return generated ECDHE key and the encrypted cell
         return encrypted_cell, ec_privkey
 
     @staticmethod
@@ -85,7 +85,7 @@ class Client:
         try:
             # verify that the cell was signed using their key.
             util.rsa_verify(rsa_key, signature, provided_cell.salt)
-            # load up their half of the ecdhe key
+            # load up their half of the ECDHE key
             their_ecdhe_key = serialization.load_pem_public_key(
                 provided_cell.payload, backend=default_backend())
             shared_key = private_ecdhe.exchange(ec.ECDH(), their_ecdhe_key)
@@ -123,21 +123,26 @@ class Client:
             if util.CLIENT_DEBUG:
                 print("First connect actual cell (encrypted)")
                 print(encrypted_cell)
-            sock.send(encrypted_cell)  # Send them my generated ecdhe key.
-            their_cell = sock.recv(4096)  # await a response.
+            # send out the generated ECDHE key
+            sock.send(encrypted_cell)
+            their_cell = sock.recv(4096)
             their_cell = pickle.loads(their_cell)
+            # check the signature and derive their key.
             derived_key = self.check_signature_and_derive(
                 their_cell, rsa_key, ec_privkey)
-            # attempt to check the signature and derive their key.
 
-            if derived_key:  # ie did not return None.
+            if derived_key:
                 if util.CLIENT_DEBUG:
                     print("Connected successfully to relay @ " + gonnect
                           + "   Port: " + str(gonnectport))
                 self.relay_list.append(
-                    RelayData(gonnect, sock, derived_key, ec_privkey, rsa_key, gonnectport))
-            else:  # Verification error or Unpacking Error occurred
-                print("Verification of signature failed/Invalid cell was received.")
+                    RelayData(gonnect, sock, derived_key,
+                              ec_privkey, rsa_key, gonnectport)
+                )
+            else:
+                # Verification error or UnpackingError occurred
+                print("Verification of signature failed"
+                      + "/Invalid cell was received.")
         except (struct.error, ConnectionResetError, ConnectionRefusedError):
             print("Disconnected or relay is not online/ connection was "
                   + "refused.", file=sys.stderr)
@@ -273,10 +278,11 @@ class Client:
         # connection type. exit node always knows
         intermediate_relays = self.relay_list
         sending_cell = Client.req_wrapper(request, intermediate_relays)
+        # calculate packet size using number of relays
         pack_size = util.BASE_PACKET_SIZE \
-            + util.WRAPPER_SIZE * (len(self.relay_list) - 1)
-        print(pack_size)
+            + util.WRAPPER_SIZE * (len(intermediate_relays) - 1)
         try:
+            # get first packet
             sock = intermediate_relays[0].sock
             sock.send(pickle.dumps(sending_cell))
             recv_cell = sock.recv(pack_size)
@@ -298,7 +304,7 @@ class Client:
                     print("Information is being streamed.")
                 recv_bytes_arr = []
                 cont_loop = True
-                # get whole TCP stream and store it
+                # get whole TCP stream and store it in array
                 while cont_loop:
                     recv_bytes = sock.recv(pack_size * 5)  # await answer
                     print(len(recv_bytes))
@@ -308,9 +314,9 @@ class Client:
                 total_payload = b"".join(recv_bytes_arr)
                 if util.CLIENT_DEBUG:
                     print(f"Total length: {len(total_payload)}")
-                # partition the entire payload to MAX_PACKET_SIZE each
+                # partition the entire payload to pack_size each
                 # and process them accordingly
-                summation = [their_cell.payload]
+                decrypted_bytes = [their_cell.payload]
                 for i in range(0, len(total_payload), pack_size):
                     recv_cell = total_payload[i:i + pack_size]
                     their_cell = pickle.loads(recv_cell)
@@ -318,10 +324,11 @@ class Client:
                         print(f"Received packet, length {len(recv_cell)}")
                     their_cell = Client.chain_decryptor(
                         intermediate_relays, their_cell)
-                    summation.append(their_cell.payload)
-                # take the sum of all your bytes
-                resp = bytes(b"".join(summation))
-                resp = pickle.loads(resp)  # load the FINAL item.
+                    decrypted_bytes.append(their_cell.payload)
+                # join all the bytes together
+                resp = bytes(b"".join(decrypted_bytes))
+                # unpickle the final concatenated bytes
+                resp = pickle.loads(resp)
                 return Client._check_response(resp)
 
             resp = pickle.loads(their_cell.payload)
@@ -333,8 +340,7 @@ class Client:
     def _check_response(response):
         if isinstance(response, requests.models.Response):
             # check if it's a response type item.
-            # This check is unnecessary based off code though...
-            # Left in in case of attack
+            # this check is unnecessary as of now...
             if util.CLIENT_DEBUG:
                 return_dict = {
                     "content": response.content.decode(response.encoding),
@@ -342,7 +348,7 @@ class Client:
                 }
                 print(json.dumps(return_dict))
             return response
-        # Reaching this branch implies data corruption of some form
+        # reaching this branch implies data corruption of some form
         return Client.failure()
 
     def close(self):  # to close things.
@@ -379,7 +385,7 @@ class Responder(BaseHTTPRequestHandler):
             answer = ""
             my_client.close()
         else:
-            # Get references from directories.
+            # get references from directories.
             relay_list = Client.get_directory_items(self.directory_address)
 
             if num_of_relays < 3 or num_of_relays > len(relay_list):
