@@ -163,21 +163,22 @@ class Client:
         sending_cell = Cell(encrypted_cell, IV=init_vector,
                             ctype=CellType.RELAY_CONNECT)
 
-        if connect_mode == 2:
-            # 2nd layer from top
-            sending_cell.ip_addr = intermediate_relays[1].ip_addr
-            sending_cell.port = intermediate_relays[1].port
-            # inform of next port of call again.
-            sending_cell = Cell(pickle.dumps(sending_cell),
-                                ctype=CellType.RELAY)
-            encrypted_cell, init_vector = util.aes_encryptor(
-                intermediate_relays[0].key,
-                sending_cell
-            )
-            sending_cell = Cell(encrypted_cell, IV=init_vector,
-                                ctype=CellType.RELAY)  # Outermost layer
-            sending_cell.ip_addr = intermediate_relays[0].ip_addr
-            sending_cell.port = intermediate_relays[0].port
+        if connect_mode >= 2:
+            for i in range(connect_mode - 1, 0, -1):
+                # 2nd layer from top
+                sending_cell.ip_addr = intermediate_relays[i].ip_addr
+                sending_cell.port = intermediate_relays[i].port
+                # inform of next port of call again.
+                sending_cell = Cell(pickle.dumps(sending_cell),
+                                    ctype=CellType.RELAY)
+                encrypted_cell, init_vector = util.aes_encryptor(
+                    intermediate_relays[i - 1].key,
+                    sending_cell
+                )
+                sending_cell = Cell(encrypted_cell, IV=init_vector,
+                                    ctype=CellType.RELAY)  # Outermost layer
+                sending_cell.ip_addr = intermediate_relays[i - 1].ip_addr
+                sending_cell.port = intermediate_relays[i - 1].port
 
         try:
             sock = intermediate_relays[0].sock
@@ -224,10 +225,9 @@ class Client:
 
         except (ConnectionResetError, ConnectionRefusedError, struct.error):
             print("Socket error.", file=sys.stderr)
-            if connect_mode == 2:
-                del self.relay_list[0]  # remove it from the list
-                if util.CLIENT_DEBUG:
-                    print("REMOVED relay 0 DUE TO FAILED CONNECTION", file=sys.stderr)
+            del self.relay_list[connect_mode - 1]  # remove it from the list
+            if util.CLIENT_DEBUG:
+                print("REMOVED relay 0 DUE TO FAILED CONNECTION", file=sys.stderr)
 
     @staticmethod
     def req_wrapper(request, relay_list):
@@ -240,7 +240,8 @@ class Client:
                                 ctype=CellType.RELAY)
             sending_cell.ip_addr = relay_list[i].ip_addr
             sending_cell.port = relay_list[i].port
-            sending_cell = Cell(pickle.dumps(sending_cell), ctype=CellType.RELAY)
+            if i != 0:
+                sending_cell = Cell(pickle.dumps(sending_cell), ctype=CellType.RELAY)
 
         return sending_cell
 
@@ -373,7 +374,6 @@ class Responder(BaseHTTPRequestHandler):
             my_client.close()
         else:
             # Get references from directories.
-
             relay_list = Client.get_directory_items(self.directory_address)
 
             if num_of_relays < 3 or num_of_relays > len(relay_list):
@@ -382,15 +382,13 @@ class Responder(BaseHTTPRequestHandler):
             if order == RANDOM_RELAY_ORDER:
                 relay_list = sample(relay_list, num_of_relays)
 
-            print(relay_list)
             for i in range(num_of_relays):
                 relay = relay_list[i]
                 pubkey = serialization.load_pem_public_key(
                     relay["key"], backend=default_backend())
                 my_client.connect_relay(relay["ip_addr"], relay["port"], pubkey, i)
-                if util.CLIENT_DEBUG:
-                    print(my_client.relay_list)
 
+            print(f"Num of relays: {len(my_client.relay_list)}")
             print(f"URL: {url}")
 
             obtained_response = my_client.req(url)
