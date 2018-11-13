@@ -68,10 +68,12 @@
 <template>
   <div class="main">
     <nav id="navigation">
-      <div id="back" class="action-button disabled">
+      <div id="back" class="action-button" :class="{disabled: backDisabled}"
+        @click="navigateHistory(-1, backDisabled)">
         <i class="fa fa-arrow-left" aria-hidden="true"></i>
       </div>
-      <div id="forward" class="action-button disabled">
+      <div id="forward" class="action-button" :class="{disabled: forwardDisabled}"
+        @click="navigateHistory(1, forwardDisabled)">
         <i class="fa fa-arrow-right" aria-hidden="true"></i>
       </div>
       <div id="refresh" class="action-button disabled">
@@ -88,6 +90,8 @@
 </template>
 
 <script>
+import { mapState } from 'vuex';
+
 import StatusComponent from './components/StatusComponent.vue';
 import SettingsComponent from './components/SettingsComponent.vue';
 import BrowserComponent from './components/BrowserComponent.vue';
@@ -95,12 +99,10 @@ import BrowserComponent from './components/BrowserComponent.vue';
 export default {
   name: 'app',
   components: { StatusComponent, SettingsComponent, BrowserComponent },
-  data() {
-    return {
-      url: 'https://www.motherfuckingwebsite.com',
-      fired: false,
-    };
-  },
+  computed: mapState({
+    backDisabled: state => (state.query.historyIndex <= 0),
+    forwardDisabled: state => (state.query.historyIndex + 1 === state.query.history.length),
+  }),
   methods: {
     updateURL(url) {
       this.url = url;
@@ -108,6 +110,19 @@ export default {
     navigate() {
       this.fired = true;
     },
+    navigateHistory(diff, disabled) {
+      if (!disabled) {
+        this.$store.dispatch('query/navigateHistory', diff).then((website) => {
+          this.url = website;
+        });
+      }
+    },
+  },
+  data() {
+    return {
+      url: 'http://www.example.com',
+      fired: false,
+    };
   },
 };
 </script>
