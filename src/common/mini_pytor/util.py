@@ -12,9 +12,9 @@ from cell import Cell
 
 RELAY_DEBUG = False
 CLIENT_DEBUG = False
-RELAY_PACKET_SIZE_1 = 4406
-RELAY_PACKET_SIZE_2 = 4598
-CLIENT_PACKET_SIZE = 4790
+BASE_PACKET_SIZE = 4406
+WRAPPER_SIZE = 192
+
 
 def padder128(data):
     """ pad ip to 256 bits... because this can vary too"""
@@ -53,6 +53,7 @@ def aes_decryptor(secret_key, cell):
     decrypted = decryptor.update(cell.payload)
     decrypted += decryptor.finalize()  # finalise decryption
     return decrypted
+
 
 def rsa_verify(pubkey, signature, message):
     "Verify signature of message using pubkey"

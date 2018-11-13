@@ -21,6 +21,7 @@ import util
 from cell import Cell, CellType
 
 DEFAULT_DIRECTORY_ADDRESS = ("127.0.0.1", 50000)
+RANDOM_RELAY_ORDER = "random"
 
 
 class Client:
@@ -47,8 +48,8 @@ class Client:
         sock.send(pickle.dumps(Cell("", ctype=CellType.GET_DIRECT)))
         received_cell = sock.recv(32768)
         received_cell = pickle.loads(received_cell)
-        if isinstance(received_cell.payload, list) and util.CLIENT_DEBUG:
-            print(received_cell.payload)
+        # if isinstance(received_cell.payload, list) and util.CLIENT_DEBUG:
+        #     print(received_cell.payload)
         return received_cell.payload
 
     @staticmethod
@@ -74,7 +75,7 @@ class Client:
                 label=None
             )
         )
-        # return my generated ecdhe key and the encrypted cell
+        # return generated ECDHE key and the encrypted cell
         return encrypted_cell, ec_privkey
 
     @staticmethod
@@ -84,7 +85,7 @@ class Client:
         try:
             # verify that the cell was signed using their key.
             util.rsa_verify(rsa_key, signature, provided_cell.salt)
-            # load up their half of the ecdhe key
+            # load up their half of the ECDHE key
             their_ecdhe_key = serialization.load_pem_public_key(
                 provided_cell.payload, backend=default_backend())
             shared_key = private_ecdhe.exchange(ec.ECDH(), their_ecdhe_key)
@@ -107,8 +108,6 @@ class Client:
 
     def connect_relay(self, gonnect, gonnectport, rsa_key, connect_mode):
         """Wrapper function for easier use"""
-        if connect_mode not in [0, 1, 2]:
-            raise Exception("Connect mode invalid.")
         if connect_mode == 0:
             self.first_connect(gonnect, gonnectport, rsa_key)
         else:
@@ -124,21 +123,26 @@ class Client:
             if util.CLIENT_DEBUG:
                 print("First connect actual cell (encrypted)")
                 print(encrypted_cell)
-            sock.send(encrypted_cell)  # Send them my generated ecdhe key.
-            their_cell = sock.recv(4096)  # await a response.
+            # send out the generated ECDHE key
+            sock.send(encrypted_cell)
+            their_cell = sock.recv(4096)
             their_cell = pickle.loads(their_cell)
+            # check the signature and derive their key.
             derived_key = self.check_signature_and_derive(
                 their_cell, rsa_key, ec_privkey)
-            # attempt to check the signature and derive their key.
 
-            if derived_key:  # ie did not return None.
+            if derived_key:
                 if util.CLIENT_DEBUG:
                     print("Connected successfully to relay @ " + gonnect
                           + "   Port: " + str(gonnectport))
                 self.relay_list.append(
-                    RelayData(gonnect, sock, derived_key, ec_privkey, rsa_key, gonnectport))
-            else:  # Verification error or Unpacking Error occurred
-                print("Verification of signature failed/Invalid cell was received.")
+                    RelayData(gonnect, sock, derived_key,
+                              ec_privkey, rsa_key, gonnectport)
+                )
+            else:
+                # Verification error or UnpackingError occurred
+                print("Verification of signature failed"
+                      + "/Invalid cell was received.")
         except (struct.error, ConnectionResetError, ConnectionRefusedError):
             print("Disconnected or relay is not online/ connection was "
                   + "refused.", file=sys.stderr)
@@ -165,21 +169,22 @@ class Client:
         sending_cell = Cell(encrypted_cell, IV=init_vector,
                             ctype=CellType.RELAY_CONNECT)
 
-        if connect_mode == 2:
-            # 2nd layer from top
-            sending_cell.ip_addr = intermediate_relays[1].ip_addr
-            sending_cell.port = intermediate_relays[1].port
-            # inform of next port of call again.
-            sending_cell = Cell(pickle.dumps(sending_cell),
-                                ctype=CellType.RELAY)
-            encrypted_cell, init_vector = util.aes_encryptor(
-                intermediate_relays[0].key,
-                sending_cell
-            )
-            sending_cell = Cell(encrypted_cell, IV=init_vector,
-                                ctype=CellType.RELAY)  # Outermost layer
-            sending_cell.ip_addr = intermediate_relays[0].ip_addr
-            sending_cell.port = intermediate_relays[0].port
+        if connect_mode >= 2:
+            for i in range(connect_mode - 1, 0, -1):
+                # 2nd layer from top
+                sending_cell.ip_addr = intermediate_relays[i].ip_addr
+                sending_cell.port = intermediate_relays[i].port
+                # inform of next port of call again.
+                sending_cell = Cell(pickle.dumps(sending_cell),
+                                    ctype=CellType.RELAY)
+                encrypted_cell, init_vector = util.aes_encryptor(
+                    intermediate_relays[i - 1].key,
+                    sending_cell
+                )
+                sending_cell = Cell(encrypted_cell, IV=init_vector,
+                                    ctype=CellType.RELAY)  # Outermost layer
+                sending_cell.ip_addr = intermediate_relays[i - 1].ip_addr
+                sending_cell.port = intermediate_relays[i - 1].port
 
         try:
             sock = intermediate_relays[0].sock
@@ -212,7 +217,8 @@ class Client:
                 if util.CLIENT_DEBUG:
                     print("FAILED AT CONNECTION!", file=sys.stderr)
                 if their_cell.payload == "CONNECTIONREFUSED":
-                    print("Connection was refused. Is the relay online yet?")
+                    print(
+                        "Connection was refused. Is the relay online yet?", file=sys.stderr)
                 return
 
             derived_key = self.check_signature_and_derive(
@@ -226,37 +232,25 @@ class Client:
 
         except (ConnectionResetError, ConnectionRefusedError, struct.error):
             print("Socket error.", file=sys.stderr)
-            if connect_mode == 2:
-                del self.relay_list[0]  # remove it from the list
-                if util.CLIENT_DEBUG:
-                    print("REMOVED relay 0 DUE TO FAILED CONNECTION")
+            del self.relay_list[connect_mode - 1]  # remove it from the list
+            if util.CLIENT_DEBUG:
+                print("REMOVED relay 0 DUE TO FAILED CONNECTION", file=sys.stderr)
 
     @staticmethod
     def req_wrapper(request, relay_list):
         """Generate a encrypted cell for sending that contains the request"""
         sending_cell = Cell(request, ctype=CellType.REQ)
-        encrypted_cell, init_vector = util.aes_encryptor(
-            relay_list[2].key, sending_cell)
-        sending_cell = Cell(encrypted_cell, IV=init_vector,
-                            ctype=CellType.RELAY)
-        sending_cell.ip_addr = relay_list[2].ip_addr
-        sending_cell.port = relay_list[2].port
-        sending_cell = Cell(pickle.dumps(sending_cell), ctype=CellType.RELAY)
+        for i in range(len(relay_list) - 1, -1, -1):
+            encrypted_cell, init_vector = util.aes_encryptor(
+                relay_list[i].key, sending_cell)
+            sending_cell = Cell(encrypted_cell, IV=init_vector,
+                                ctype=CellType.RELAY)
+            sending_cell.ip_addr = relay_list[i].ip_addr
+            sending_cell.port = relay_list[i].port
+            if i != 0:
+                sending_cell = Cell(pickle.dumps(
+                    sending_cell), ctype=CellType.RELAY)
 
-        encrypted_cell, init_vector = util.aes_encryptor(
-            relay_list[1].key, sending_cell)
-        sending_cell = Cell(encrypted_cell, IV=init_vector,
-                            ctype=CellType.RELAY)
-        sending_cell.ip_addr = relay_list[1].ip_addr
-        sending_cell.port = relay_list[1].port
-        sending_cell = Cell(pickle.dumps(sending_cell), ctype=CellType.RELAY)
-
-        encrypted_cell, init_vector = util.aes_encryptor(
-            relay_list[0].key, sending_cell)
-        sending_cell = Cell(encrypted_cell, IV=init_vector,
-                            ctype=CellType.RELAY)
-        sending_cell.ip_addr = relay_list[0].ip_addr
-        sending_cell.port = relay_list[0].port
         return sending_cell
 
     @staticmethod
@@ -284,10 +278,14 @@ class Client:
         # connection type. exit node always knows
         intermediate_relays = self.relay_list
         sending_cell = Client.req_wrapper(request, intermediate_relays)
+        # calculate packet size using number of relays
+        pack_size = util.BASE_PACKET_SIZE \
+            + util.WRAPPER_SIZE * (len(intermediate_relays) - 1)
         try:
+            # get first packet
             sock = intermediate_relays[0].sock
             sock.send(pickle.dumps(sending_cell))
-            recv_cell = sock.recv(4790)
+            recv_cell = sock.recv(pack_size)
             their_cell = pickle.loads(recv_cell)
             if util.CLIENT_DEBUG:
                 print("received cell")
@@ -306,30 +304,31 @@ class Client:
                     print("Information is being streamed.")
                 recv_bytes_arr = []
                 cont_loop = True
-                # get whole TCP stream and store it
+                # get whole TCP stream and store it in array
                 while cont_loop:
-                    recv_bytes = sock.recv(
-                        util.CLIENT_PACKET_SIZE * 3)  # await answer
-                    if len(recv_bytes) < util.CLIENT_PACKET_SIZE:
+                    recv_bytes = sock.recv(pack_size * 5)  # await answer
+                    print(len(recv_bytes))
+                    if len(recv_bytes) < pack_size:
                         cont_loop = False
                     recv_bytes_arr.append(recv_bytes)
                 total_payload = b"".join(recv_bytes_arr)
                 if util.CLIENT_DEBUG:
                     print(f"Total length: {len(total_payload)}")
-                # partition the entire payload to MAX_PACKET_SIZE each
+                # partition the entire payload to pack_size each
                 # and process them accordingly
-                summation = [their_cell.payload]
-                for i in range(0, len(total_payload), util.CLIENT_PACKET_SIZE):
-                    recv_cell = total_payload[i:i + util.CLIENT_PACKET_SIZE]
+                decrypted_bytes = [their_cell.payload]
+                for i in range(0, len(total_payload), pack_size):
+                    recv_cell = total_payload[i:i + pack_size]
                     their_cell = pickle.loads(recv_cell)
                     if util.CLIENT_DEBUG:
                         print(f"Received packet, length {len(recv_cell)}")
                     their_cell = Client.chain_decryptor(
                         intermediate_relays, their_cell)
-                    summation.append(their_cell.payload)
-                # take the sum of all your bytes
-                resp = bytes(b"".join(summation))
-                resp = pickle.loads(resp)  # load the FINAL item.
+                    decrypted_bytes.append(their_cell.payload)
+                # join all the bytes together
+                resp = bytes(b"".join(decrypted_bytes))
+                # unpickle the final concatenated bytes
+                resp = pickle.loads(resp)
                 return Client._check_response(resp)
 
             resp = pickle.loads(their_cell.payload)
@@ -341,8 +340,7 @@ class Client:
     def _check_response(response):
         if isinstance(response, requests.models.Response):
             # check if it's a response type item.
-            # This check is unnecessary based off code though...
-            # Left in in case of attack
+            # this check is unnecessary as of now...
             if util.CLIENT_DEBUG:
                 return_dict = {
                     "content": response.content.decode(response.encoding),
@@ -350,7 +348,7 @@ class Client:
                 }
                 print(json.dumps(return_dict))
             return response
-        # Reaching this branch implies data corruption of some form
+        # reaching this branch implies data corruption of some form
         return Client.failure()
 
     def close(self):  # to close things.
@@ -376,53 +374,66 @@ class Responder(BaseHTTPRequestHandler):
     def do_GET(self):
         """Get request response method"""
         my_client = Client()
-        # Get references from directories.
-        relay_list = Client.get_directory_items(self.directory_address)
-        relay_list = sample(relay_list, 3)
-        print(relay_list)
-        NUM_RELAYS = 3
-
-        for i in range(NUM_RELAYS):
-            relay = relay_list[i]
-            pubkey = serialization.load_pem_public_key(
-                relay["key"], backend=default_backend())
-            my_client.connect_relay(relay["ip_addr"], relay["port"], pubkey, i)
-            if util.CLIENT_DEBUG:
-                print(my_client.relay_list)
-
         if self.path == "/favicon.ico":
             return
-        path = Responder._handle_url(self.path)
-        print(f"URL: {path}")
-        obtained_response = my_client.req(path)
-        if isinstance(obtained_response, str):
-            print("Producing invalid reply")
+
+        url, order, num_of_relays = Responder._handle_url(self.path)
+
+        if url is None or order is None:
+            print("Producing invalid reply", file=sys.stderr)
             self.send_response(404)
-            answer = obtained_response.encode()
+            answer = ""
             my_client.close()
         else:
-            print("Producing valid reply")
-            self.send_response(obtained_response.status_code)
-            my_client.close()
-            answer = bytes(obtained_response.content)
+            # get references from directories.
+            relay_list = Client.get_directory_items(self.directory_address)
+
+            if num_of_relays < 3 or num_of_relays > len(relay_list):
+                num_of_relays = 3
+
+            if order == RANDOM_RELAY_ORDER:
+                relay_list = sample(relay_list, num_of_relays)
+
+            for i in range(num_of_relays):
+                relay = relay_list[i]
+                pubkey = serialization.load_pem_public_key(
+                    relay["key"], backend=default_backend())
+                my_client.connect_relay(
+                    relay["ip_addr"], relay["port"], pubkey, i)
+
+            print(f"Num of relays: {len(my_client.relay_list)}")
+            print(f"URL: {url}")
+
+            obtained_response = my_client.req(url)
+            if isinstance(obtained_response, str):
+                print("Producing invalid reply", file=sys.stderr)
+                self.send_response(404)
+                answer = obtained_response.encode()
+                my_client.close()
+            else:
+                print("Producing valid reply")
+                self.send_response(obtained_response.status_code)
+                my_client.close()
+                answer = bytes(obtained_response.content)
         self.send_header('Content-type', 'text/html')
         self.end_headers()
         self.wfile.write(answer)
 
     @staticmethod
     def _handle_url(url_path):
-        fallback = "http://www.example.com"
         query = urllib.parse.parse_qs(url_path[2:])
-        if not query:
-            index1 = url_path.find("http://")
-            index2 = url_path.find("https://")
-            if index1 != -1:
-                return url_path[index1:]
-            if index2 != -1:
-                return url_path[index2:]
-        if "req" in query:
-            return query["req"][0]
-        return fallback
+        count = 3
+        url = None
+        order = RANDOM_RELAY_ORDER
+
+        if "count" in query:
+            count = int(query["count"][0])
+        if "url" in query:
+            url = query["url"][0]
+        if "order" in query:
+            order = query["order"][0]
+
+        return url, order, count
 
 
 class CustomHTTPServer:

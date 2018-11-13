@@ -33,19 +33,61 @@ const actions = {
     commit('connecting');
     getDirectoryStatus().then((relays) => {
       commit('setRelays', relays);
-      spawnClient().then(() => {
+      spawnClient().then((client) => {
         commit('connected');
+        client.stdout.on('data', (data) => {
+          console.log(`stdout: ${data}`);
+        });
+        // error encountered in the client.
+        // TODO: determine if client should restart.
+        client.stderr.on('data', (data) => {
+          commit('connectionFailed', data);
+          // dispatch('decrementDelay');
+        });
       });
     }).catch((message) => {
+      // error encountered when pinging the directory.
       commit('connectionFailed', message);
       dispatch('decrementDelay');
     });
   },
+  pingDirectoryStatus({ commit }) {
+    getDirectoryStatus().then((relays) => {
+      commit('updateRelays', relays);
+    });
+  },
 };
+
+const relayAddresses = relays => relays.map(relay => relay.address);
 
 const mutations = {
   setRelays(state, relays) {
-    state.relays = relays;
+    state.relays = relays.map((relay) => {
+      const updatedRelay = {};
+      updatedRelay.address = relay;
+      updatedRelay.status = 'online';
+      return updatedRelay;
+    });
+  },
+  updateRelays(state, relays) {
+    const tempRelays = state.relays.map((relay) => {
+      if (!relays.includes(relay.address)) {
+        relay.status = 'offline';
+      }
+      return relay;
+    });
+
+    // add new relays
+    relays.forEach((newRelay) => {
+      if (!relayAddresses(tempRelays).includes(newRelay)) {
+        const updatedRelay = {};
+        updatedRelay.address = newRelay;
+        updatedRelay.status = 'online';
+        tempRelays.push(newRelay);
+      }
+    });
+
+    state.relays = tempRelays;
   },
   connecting(state) {
     state.message = 'Connecting..';

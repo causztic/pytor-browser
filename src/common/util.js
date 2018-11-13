@@ -7,22 +7,6 @@ const isDevelopment = process.env.NODE_ENV !== 'production';
 // eslint-disable-next-line no-undef
 const staticPath = isDevelopment ? __static : __dirname.replace(/app\.asar$/, 'static');
 
-// set up listeners at the start of each spawn ASAP to avoid missing out
-const setUpListeners = (instance) => {
-  instance.stdout.on('data', (data) => {
-    console.log(`stdout: ${data}`);
-  });
-
-  instance.stderr.on('data', (data) => {
-    console.log(`stderr: ${data}`);
-    throw data;
-  });
-
-  instance.on('close', (code) => {
-    console.log(`child process exited with code ${code}`);
-  });
-};
-
 const spawnClient = () => new Promise((resolve, _) => {
   setTimeout(() => {
     const client = spawn(
@@ -30,9 +14,8 @@ const spawnClient = () => new Promise((resolve, _) => {
       ['./mini_pytor/client.py'],
       { cwd: __dirname },
     );
-    setUpListeners(client);
     electron.ipcRenderer.send('pid-msg', client.pid);
-    resolve();
+    resolve(client);
   }, 500);
 });
 

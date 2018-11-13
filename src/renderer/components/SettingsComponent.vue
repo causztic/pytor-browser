@@ -17,6 +17,18 @@
     display: block;
     font-size: 0.9em;
   }
+  span.online, span.offline {
+    width: 10px;
+    height: 10px;
+    display: inline-block;
+    border-radius: 50%;
+  }
+  span.online {
+    background-color: green;
+  }
+  span.offline {
+    background-color: red;
+  }
 </style>
 
 <template>
@@ -25,10 +37,15 @@
       <i class="fa fa-ellipsis-v" aria-hidden="true"></i>
     </div>
     <div id="options-menu" v-if="showMenu">
-      <h1>Online Relays</h1>
-      <span class="relay" v-for="relay in relays" :key="relay">
-        {{ relay }}
+      <h2>Relays</h2>
+      <span class="relay" v-for="relay in relays" :key="relay.address">
+        <span :class="relay.status"></span>
+        <b>{{ relay.address }}</b>
       </span>
+      <h2>Connections</h2>
+      <select v-model="nodeCount">
+        <option v-for="count in relayCounts" :key="count">{{count}}</option>
+      </select>
     </div>
   </div>
 </template>
@@ -40,12 +57,19 @@ export default {
   name: 'SettingsComponent',
   computed: mapState({
     relays: state => state.status.relays,
+    relayCounts: (state) => {
+      if (state.status.relays.length <= 3) {
+        return [3];
+      }
+      return Array(state.status.relays.filter(relay => relay.status === 'online').length - 2).fill().map((_, i) => i + 3);
+    },
   }),
   methods: {
     toggleMenu() {
       this.showMenu = !this.showMenu;
       if (this.showMenu) {
         this.activeClass = 'action-button active';
+        this.$store.dispatch('status/pingDirectoryStatus');
       } else {
         this.activeClass = 'action-button';
       }
@@ -57,10 +81,15 @@ export default {
       }
     },
   },
+  watch: {
+    nodeCount(newVal, _) {
+      this.$store.dispatch('query/setNodeCount', newVal);
+    },
+  },
   data() {
     return {
       showMenu: false,
-      nodeCount: 0,
+      nodeCount: 3,
       activeClass: 'action-button',
     };
   },

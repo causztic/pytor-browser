@@ -16,7 +16,7 @@ IDS+=($!)
 sleep 3
 
 echo "Setting up Relays"
-for relay in a b c; do
+for relay in a b c d e; do
   python src/common/mini_pytor/relay.py $relay &
   IDS+=($!)
 done
