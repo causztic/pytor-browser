@@ -58,11 +58,10 @@
         text-align: left;
         padding: 4px 2px;
         cursor: pointer;
-      }
-
-      .autocomplete-result:hover {
-        background-color: #4AAE9B;
-        color: white;
+        &.active, &:hover {
+          background-color: #4AAE9B;
+          color: white;
+        }
       }
     }
     .action-button {
@@ -105,10 +104,14 @@
       <div id="refresh" class="action-button disabled">
         <i class="fa fa-sync" aria-hidden="true"></i>
       </div>
-      <div id="omnibox">
-        <input v-model="url" type="text" id="url" @keyup.enter="navigate" @input="onChange">
-        <ul class="autocomplete-results" v-show="isOpen">
+      <div id="omnibox" v-click-outside="hideAutoComplete">
+        <input v-model="url" type="text" id="url"
+          @keyup.enter="navigate" @input="onChange"
+          @keydown.down="onArrowDown"
+          @keydown.up="onArrowUp">
+        <ul class="autocomplete-results" v-show="isOpen && results.length > 0">
           <li class="autocomplete-result"
+            :class="{ 'active': i === arrowCounter }"
             v-for="(result, i) in results" :key="i" @click="setURLFromResult(result)">
             {{ result }}
           </li>
@@ -138,8 +141,24 @@ export default {
   }),
   methods: {
     onChange() {
-      this.isOpen = true;
       this.filterResults();
+      if (this.results.length > 0) {
+        this.isOpen = true;
+      }
+    },
+    onArrowDown() {
+      if (this.arrowCounter < this.results.length - 1) {
+        this.arrowCounter = this.arrowCounter + 1;
+      }
+    },
+    onArrowUp() {
+      if (this.arrowCounter > 0) {
+        this.arrowCounter = this.arrowCounter - 1;
+      }
+    },
+    hideAutoComplete() {
+      this.isOpen = false;
+      this.arrowCounter = -1;
     },
     filterResults() {
       this.results = this.history.filter(item => item.toLowerCase()
@@ -153,6 +172,10 @@ export default {
       this.url = url;
     },
     navigate() {
+      if (this.arrowCounter !== -1) {
+        this.updateURL(this.results[this.arrowCounter]);
+      }
+      this.arrowCounter = -1;
       this.fired = true;
       this.isOpen = false;
     },
@@ -170,6 +193,7 @@ export default {
       fired: false,
       isOpen: false,
       results: [],
+      arrowCounter: -1,
     };
   },
 };
