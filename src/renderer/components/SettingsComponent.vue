@@ -61,7 +61,7 @@ export default {
       if (state.status.relays.length <= 3) {
         return [3];
       }
-      return Array(state.status.relays.length - 2).fill().map((_, i) => i + 3);
+      return Array(state.status.relays.filter(relay => relay.status === 'online').length - 2).fill().map((_, i) => i + 3);
     },
   }),
   methods: {

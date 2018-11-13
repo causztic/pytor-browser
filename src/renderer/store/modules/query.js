@@ -19,9 +19,7 @@ const actions = {
     }
 
     if (rootState.status.connected) {
-      if (state.history.slice(-1)[0] !== website) {
-        dispatch('status/load', { website }, { root: true });
-      }
+      dispatch('status/load', { website }, { root: true });
       commit('setActualURL', website);
       commit('addQueryToHistory', website);
     }
