@@ -23,6 +23,7 @@ from cell import Cell, CellType
 DEFAULT_DIRECTORY_ADDRESS = ("127.0.0.1", 50000)
 RANDOM_RELAY_ORDER = "random"
 
+
 class Client:
     """Client class"""
 
@@ -211,7 +212,8 @@ class Client:
                 if util.CLIENT_DEBUG:
                     print("FAILED AT CONNECTION!", file=sys.stderr)
                 if their_cell.payload == "CONNECTIONREFUSED":
-                    print("Connection was refused. Is the relay online yet?", file=sys.stderr)
+                    print(
+                        "Connection was refused. Is the relay online yet?", file=sys.stderr)
                 return
 
             derived_key = self.check_signature_and_derive(
@@ -241,7 +243,8 @@ class Client:
             sending_cell.ip_addr = relay_list[i].ip_addr
             sending_cell.port = relay_list[i].port
             if i != 0:
-                sending_cell = Cell(pickle.dumps(sending_cell), ctype=CellType.RELAY)
+                sending_cell = Cell(pickle.dumps(
+                    sending_cell), ctype=CellType.RELAY)
 
         return sending_cell
 
@@ -270,10 +273,13 @@ class Client:
         # connection type. exit node always knows
         intermediate_relays = self.relay_list
         sending_cell = Client.req_wrapper(request, intermediate_relays)
+        pack_size = util.BASE_PACKET_SIZE \
+            + util.WRAPPER_SIZE * (len(self.relay_list) - 1)
+        print(pack_size)
         try:
             sock = intermediate_relays[0].sock
             sock.send(pickle.dumps(sending_cell))
-            recv_cell = sock.recv(4790)
+            recv_cell = sock.recv(pack_size)
             their_cell = pickle.loads(recv_cell)
             if util.CLIENT_DEBUG:
                 print("received cell")
@@ -294,9 +300,9 @@ class Client:
                 cont_loop = True
                 # get whole TCP stream and store it
                 while cont_loop:
-                    recv_bytes = sock.recv(
-                        util.CLIENT_PACKET_SIZE * 3)  # await answer
-                    if len(recv_bytes) < util.CLIENT_PACKET_SIZE:
+                    recv_bytes = sock.recv(pack_size * 5)  # await answer
+                    print(len(recv_bytes))
+                    if len(recv_bytes) < pack_size:
                         cont_loop = False
                     recv_bytes_arr.append(recv_bytes)
                 total_payload = b"".join(recv_bytes_arr)
@@ -305,8 +311,8 @@ class Client:
                 # partition the entire payload to MAX_PACKET_SIZE each
                 # and process them accordingly
                 summation = [their_cell.payload]
-                for i in range(0, len(total_payload), util.CLIENT_PACKET_SIZE):
-                    recv_cell = total_payload[i:i + util.CLIENT_PACKET_SIZE]
+                for i in range(0, len(total_payload), pack_size):
+                    recv_cell = total_payload[i:i + pack_size]
                     their_cell = pickle.loads(recv_cell)
                     if util.CLIENT_DEBUG:
                         print(f"Received packet, length {len(recv_cell)}")
@@ -386,7 +392,8 @@ class Responder(BaseHTTPRequestHandler):
                 relay = relay_list[i]
                 pubkey = serialization.load_pem_public_key(
                     relay["key"], backend=default_backend())
-                my_client.connect_relay(relay["ip_addr"], relay["port"], pubkey, i)
+                my_client.connect_relay(
+                    relay["ip_addr"], relay["port"], pubkey, i)
 
             print(f"Num of relays: {len(my_client.relay_list)}")
             print(f"URL: {url}")
