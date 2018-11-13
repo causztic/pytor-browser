@@ -23,6 +23,7 @@
       margin-right: 5px;
     }
     #omnibox {
+      position: relative;
       flex: 1;
       width: 100%;
       input {
@@ -37,6 +38,31 @@
           background-color: #fff;
           border: 1px solid #aaf;
         }
+      }
+      .autocomplete-results {
+        padding: 0;
+        margin: 0;
+        border: 1px solid #eeeeee;
+        height: 120px;
+        overflow: auto;
+        background-color: #fff;
+        border-radius: 0 0 10px 10px;
+        filter: drop-shadow(2px 2px rgba(220, 220, 220, 0.2));
+        position: absolute;
+        width: 100%;
+      }
+
+      .autocomplete-result {
+        font-family: sans-serif;
+        list-style: none;
+        text-align: left;
+        padding: 4px 2px;
+        cursor: pointer;
+      }
+
+      .autocomplete-result:hover {
+        background-color: #4AAE9B;
+        color: white;
       }
     }
     .action-button {
@@ -80,7 +106,13 @@
         <i class="fa fa-sync" aria-hidden="true"></i>
       </div>
       <div id="omnibox">
-        <input v-model="url" type="text" id="url" @keyup.enter="navigate">
+        <input v-model="url" type="text" id="url" @keyup.enter="navigate" @input="onChange">
+        <ul class="autocomplete-results" v-show="isOpen">
+          <li class="autocomplete-result"
+            v-for="(result, i) in results" :key="i" @click="setURLFromResult(result)">
+            {{ result }}
+          </li>
+        </ul>
       </div>
       <SettingsComponent />
     </nav>
@@ -100,15 +132,29 @@ export default {
   name: 'app',
   components: { StatusComponent, SettingsComponent, BrowserComponent },
   computed: mapState({
+    history: state => [...new Set(state.query.history)],
     backDisabled: state => (state.query.historyIndex <= 0),
     forwardDisabled: state => (state.query.historyIndex + 1 === state.query.history.length),
   }),
   methods: {
+    onChange() {
+      this.isOpen = true;
+      this.filterResults();
+    },
+    filterResults() {
+      this.results = this.history.filter(item => item.toLowerCase()
+        .indexOf(this.url.toLowerCase()) > -1);
+    },
+    setURLFromResult(url) {
+      this.updateURL(url);
+      this.navigate();
+    },
     updateURL(url) {
       this.url = url;
     },
     navigate() {
       this.fired = true;
+      this.isOpen = false;
     },
     navigateHistory(diff, disabled) {
       if (!disabled) {
@@ -122,6 +168,8 @@ export default {
     return {
       url: 'http://www.example.com',
       fired: false,
+      isOpen: false,
+      results: [],
     };
   },
 };
