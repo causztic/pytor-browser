@@ -233,28 +233,15 @@ class Client:
     def req_wrapper(request, relay_list):
         """Generate a encrypted cell for sending that contains the request"""
         sending_cell = Cell(request, ctype=CellType.REQ)
-        encrypted_cell, init_vector = util.aes_encryptor(
-            relay_list[2].key, sending_cell)
-        sending_cell = Cell(encrypted_cell, IV=init_vector,
-                            ctype=CellType.RELAY)
-        sending_cell.ip_addr = relay_list[2].ip_addr
-        sending_cell.port = relay_list[2].port
-        sending_cell = Cell(pickle.dumps(sending_cell), ctype=CellType.RELAY)
+        for i in range(len(relay_list) - 1, -1, -1):
+            encrypted_cell, init_vector = util.aes_encryptor(
+                relay_list[i].key, sending_cell)
+            sending_cell = Cell(encrypted_cell, IV=init_vector,
+                                ctype=CellType.RELAY)
+            sending_cell.ip_addr = relay_list[i].ip_addr
+            sending_cell.port = relay_list[i].port
+            sending_cell = Cell(pickle.dumps(sending_cell), ctype=CellType.RELAY)
 
-        encrypted_cell, init_vector = util.aes_encryptor(
-            relay_list[1].key, sending_cell)
-        sending_cell = Cell(encrypted_cell, IV=init_vector,
-                            ctype=CellType.RELAY)
-        sending_cell.ip_addr = relay_list[1].ip_addr
-        sending_cell.port = relay_list[1].port
-        sending_cell = Cell(pickle.dumps(sending_cell), ctype=CellType.RELAY)
-
-        encrypted_cell, init_vector = util.aes_encryptor(
-            relay_list[0].key, sending_cell)
-        sending_cell = Cell(encrypted_cell, IV=init_vector,
-                            ctype=CellType.RELAY)
-        sending_cell.ip_addr = relay_list[0].ip_addr
-        sending_cell.port = relay_list[0].port
         return sending_cell
 
     @staticmethod
