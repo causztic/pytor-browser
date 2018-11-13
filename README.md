@@ -25,8 +25,8 @@ python -m pip install cryptography requests
 ## Running
 
 ```sh
-sudo chmod +x test_spawns.sh
-sudo ./test_spawns.sh
+chmod +x test_spawns.sh
+./test_spawns.sh
 yarn dev
 ```
 
