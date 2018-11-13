@@ -36,6 +36,7 @@ export default {
   computed: mapState({
     actualURL: state => state.query.actualURL,
     connected: state => state.status.connected,
+    currentURL: state => state.query.history.slice(-1)[0],
   }),
   methods: {
     loadStop() {
@@ -43,8 +44,16 @@ export default {
     },
     injectURL(event) {
       event.preventDefault();
-      this.$emit('linkClick', event.url);
-      this.$store.dispatch('query/getWebsite', event.url);
+      let { url } = event;
+      if (event.url.startsWith('http://localhost:27182')) {
+        // relative link, append current website
+        // eslint-disable-next-line no-unused-vars
+        const [protocol, _, host] = this.currentURL.split('/');
+        url = `${protocol}//${host}${event.url.split('http://localhost:27182')[1]}`;
+      }
+      console.log(url);
+      this.$emit('linkClick', url);
+      this.$store.dispatch('query/getWebsite', url);
     },
   },
   watch: {

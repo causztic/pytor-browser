@@ -6,13 +6,10 @@ const state = {
   nodeCount: 3,
 };
 
-// getters
-const getters = {};
-
 // actions
 const actions = {
   getWebsite({
-    state, commit, dispatch, rootState,
+    commit, dispatch, rootState,
   }, website) {
     if (!website.startsWith('http://') && !website.startsWith('https://')) {
       website = `http://${website}`;
@@ -45,7 +42,6 @@ const mutations = {
 export default {
   namespaced: true,
   state,
-  getters,
   actions,
   mutations,
 };
