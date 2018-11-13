@@ -483,7 +483,8 @@ def main():
 
         if len(sys.argv) == 4:
             relay = Relay(int(port), identity, (sys.argv[2], int(sys.argv[3])))
-        relay = Relay(int(port), identity)
+        else:
+            relay = Relay(int(port), identity)
     else:
         print("Usage: python relay.py [port] (directory ip) (directory port)")
         return
